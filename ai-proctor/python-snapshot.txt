@@ -1,0 +1,1054 @@
+﻿
+=== PATH: python-ai/server.py ===
+import cv2
+import time
+import base64
+import numpy as np
+import json
+import asyncio
+import websockets
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+
+from modules.face_detection import FaceDetector
+from modules.head_pose import HeadPoseEstimator
+from modules.head_pose_logic import HeadPoseLogic
+from modules.eye_tracking import EyeTracker
+from modules.eye_tracking_logic import EyeTrackingLogic
+from modules.speech_detection import SpeechDetector
+from modules.speech_logic import SpeechLogic
+from modules.object_detection import ObjectDetector
+from config import settings
+
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ObjectDetector stays global â€” YOLO model is stateless and expensive to load
+object_detector  = ObjectDetector()
+
+# Map Python warning strings to your MongoDB cheatingLog enum types
+WARNING_TO_TYPE = {
+    "No Person Detected":        "no_face_detected",
+    "Multiple People Detected":  "multiple_faces",
+    "Phone Detected":            "cell_phone_detected",
+    "Cheating: Looking Away":    "suspicious_movement",
+    "Cheating: Eye Tracking":    "suspicious_movement",
+    "Speech Detection":          "speech_detected",
+}
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    print("WebSocket Connection Accepted")
+
+    # Per-session instances â€” no shared state between concurrent students
+    face_detector    = FaceDetector(settings.FACE_CONFIDENCE)
+    pose_estimator   = HeadPoseEstimator()
+    pose_logic       = HeadPoseLogic()
+    eye_tracker      = EyeTracker()
+    eye_logic        = EyeTrackingLogic()
+    speech_detector  = SpeechDetector()
+    speech_logic     = SpeechLogic()
+
+    exam_id = None
+
+    try:
+        while True:
+            try:
+                message = await websocket.receive()
+
+                # Binary = audio chunk for speech detection
+                if "bytes" in message:
+                    audio_bytes = message["bytes"]
+                    is_speaking = speech_detector.process_audio_chunk(audio_bytes)
+                    speech_logic.update(is_speaking)
+                    if speech_logic.cheating:
+                        await websocket.send_text(json.dumps({
+                            "warning": "Speech Detection",
+                            "warnings": ["Speech Detection"],
+                            "violation_type": "speech_detected",
+                            "exam_id": exam_id,
+                            "image": None
+                        }))
+                    continue
+
+                if "text" not in message or message["text"] is None:
+                    continue
+
+                data = message["text"]
+
+                # First message can be JSON with examId
+                if data.startswith("{"):
+                    try:
+                        meta = json.loads(data)
+                        if "examId" in meta:
+                            exam_id = meta["examId"]
+                            print(f"Exam ID set: {exam_id}")
+                    except:
+                        pass
+                    continue
+
+                # Image frame
+                if data.startswith("data:image"):
+                    data = data.split(",")[1]
+                else:
+                    continue
+
+                missing_padding = len(data) % 4
+                if missing_padding:
+                    data += "=" * (4 - missing_padding)
+
+                img_bytes = base64.b64decode(data)
+                nparr = np.frombuffer(img_bytes, np.uint8)
+                frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+                if frame is None:
+                    continue
+
+                # Face detection
+                faces = face_detector.detect_faces(frame)
+                for (x, y, w, h) in faces:
+                    cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
+
+                # Head pose
+                direction, angle = pose_estimator.get_pose(frame)
+                cheating = pose_logic.update(direction)
+
+                # Eye tracking
+                eye_dir = eye_tracker.get_eye_direction(frame)
+                eye_cheating = eye_logic.update(eye_dir)
+
+                # Speech (state managed by binary audio above)
+                speech_cheating = speech_logic.cheating
+
+                # YOLO object detection
+                detections = object_detector.detect(frame)
+                phone_detected = False
+                person_count = 0
+
+                for det in detections:
+                    label = det["label"]
+                    conf  = det["confidence"]
+                    x1, y1, x2, y2 = det["box"]
+
+                    if label == "person" and conf > 0.80:
+                        person_count += 1
+                        cv2.rectangle(frame, (x1,y1),(x2,y2),(255,0,0),2)
+                    elif label == "person":
+                        continue
+                    elif label == "cell phone":
+                        phone_detected = True
+                        cv2.rectangle(frame, (x1,y1),(x2,y2),(0,0,255),2)
+                        cv2.putText(frame, f"{label} {conf:.2f}",
+                                    (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX,
+                                    0.5, (0,0,255), 2)
+
+                # Build warnings list
+                warnings = []
+                if len(faces) == 0:
+                    warnings.append("No Person Detected")
+                if len(faces) > settings.MAX_FACES_ALLOWED:
+                    warnings.append("Multiple People Detected")
+                if phone_detected:
+                    warnings.append("Phone Detected")
+                if person_count > 1 and "Multiple People Detected" not in warnings:
+                    warnings.append("Multiple People Detected")
+                if cheating:
+                    warnings.append("Cheating: Looking Away")
+                if eye_cheating:
+                    warnings.append("Cheating: Eye Tracking")
+                if speech_cheating:
+                    warnings.append("Speech Detection")
+                if not warnings:
+                    warnings.append("Normal")
+
+                warning = warnings[0]
+
+                # Draw overlay on frame
+                if warning != "Normal":
+                    cv2.putText(frame, f"WARNING: {warning}", (20, 40),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0,0,255), 2)
+
+                if direction in ["Calibrating..."]:
+                    h_f, w_f, _ = frame.shape
+                    cv2.putText(frame,
+                        "Calibrating... Please sit still (3s)",
+                        (20, 80), cv2.FONT_HERSHEY_SIMPLEX,
+                        0.6, (0,255,255), 2)
+                    cv2.rectangle(frame,
+                        (int(w_f/2-100), int(h_f/2-150)),
+                        (int(w_f/2+100), int(h_f/2+150)),
+                        (0,255,255), 2)
+
+                # Encode frame back to base64
+                _, buffer = cv2.imencode(".jpg", frame)
+                encoded_img = base64.b64encode(buffer).decode("utf-8")
+
+                # Map to violation type for React to log
+                violation_type = WARNING_TO_TYPE.get(warning, None)
+
+                response = {
+                    "warning":        warning,
+                    "warnings":       warnings,
+                    "violation_type": violation_type,
+                    "exam_id":        exam_id,
+                    "image":          f"data:image/jpeg;base64,{encoded_img}"
+                }
+
+                await websocket.send_text(json.dumps(response))
+
+            except WebSocketDisconnect:
+                print("WebSocket Disconnected")
+                break
+            except (websockets.exceptions.ConnectionClosedOK, websockets.exceptions.ConnectionClosedError):
+                print("WebSocket Connection Closed")
+                break
+            except Exception as e:
+                if "disconnect" in str(e).lower():
+                    print("WebSocket Disconnected (cleanup)")
+                    break
+                import traceback
+                with open("error_log.txt", "a") as f:
+                    f.write(traceback.format_exc() + "\n")
+                print(f"Frame error (ignored): {e}")
+                await asyncio.sleep(0.05)
+
+    except Exception as fatal_e:
+        print(f"Fatal error: {fatal_e}")
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
+
+=== END ===
+
+=== PATH: python-ai/main.py ===
+import cv2
+import time
+from modules.face_detection import FaceDetector
+from modules.head_pose import HeadPoseEstimator
+from modules.head_pose_logic import HeadPoseLogic
+from modules.eye_tracking import EyeTracker
+from modules.eye_tracking_logic import EyeTrackingLogic
+from modules.speech_detection import SpeechDetector
+from modules.speech_logic import SpeechLogic
+from modules.object_detection import ObjectDetector
+from config import settings
+
+def main():
+    cap = cv2.VideoCapture(settings.CAMERA_INDEX)
+
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, settings.FRAME_WIDTH)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, settings.FRAME_HEIGHT)
+
+    # Modules
+    face_detector = FaceDetector(settings.FACE_CONFIDENCE)
+    pose_estimator = HeadPoseEstimator()
+    pose_logic = HeadPoseLogic()
+    eye_tracker = EyeTracker()
+    eye_logic = EyeTrackingLogic()
+    speech_detector = SpeechDetector()
+    speech_logic = SpeechLogic()
+    object_detector = ObjectDetector()
+    
+    previous_warning = "Normal"
+
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        # =========================
+        # FACE DETECTION
+        # =========================
+        faces = face_detector.detect_faces(frame)
+
+        for (x, y, w, h) in faces:
+            cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
+
+        # =========================
+        # HEAD POSE
+        # =========================
+        direction, angle = pose_estimator.get_pose(frame)
+        cheating = pose_logic.update(direction)
+
+        # =========================
+        # EYE TRACKING
+        # =========================
+        eye_dir = eye_tracker.get_eye_direction(frame)
+        eye_cheating = eye_logic.update(eye_dir)
+
+        # =========================
+        # SPEECH DETECTION
+        # =========================
+        is_speaking = speech_detector.get_speech_status()
+        speech_cheating = speech_logic.update(is_speaking)
+
+        # =========================
+        # YOLO OBJECT DETECTION
+        # =========================
+        detections = object_detector.detect(frame)
+
+        phone_detected = False
+        multiple_persons_yolo = False
+        person_count = 0
+
+        for det in detections:
+            label = det["label"]
+            conf = det["confidence"]
+            x1, y1, x2, y2 = det["box"]
+
+            # ط¹ط¯ ط§ظ„ط£ط´ط®ط§طµ ط¨ط­ط¯ ط£ط¯ظ†ظ‰ ظ„ظ„ط«ظ‚ط© ط¹ط´ط§ظ† ظ…ظٹط¹طھط¨ط±ط´ ط§ظ„ط£ط´ظٹط§ط، ط§ظ„ط¹ط§ط¯ظٹط© ط£ط´ط®ط§طµ
+            if label == "person" and conf > 0.65:
+                person_count += 1
+                color_box = (255, 0, 0)  # Blue
+            elif label == "person":
+                continue # طھط¬ط§ظ‡ظ„ ط§ظ„ط£ط´ظٹط§ط، ط§ظ„ظˆظ‡ظ…ظٹط© ط§ظ„ظ„ظٹ ط«ظ‚طھظ‡ط§ ط¶ط¹ظٹظپط©
+
+            # طھط­ط¯ظٹط¯ ط§ظ„ظ„ظˆظ† ظ„ط¨ط§ظ‚ظٹ ط§ظ„ط£ط´ظٹط§ط،
+            elif label == "cell phone" or label == "laptop":
+                phone_detected = True
+                color_box = (0, 0, 255)  # Red
+
+            else:
+                color_box = (0, 255, 0)
+
+            # ط±ط³ظ… ط§ظ„ظ…ط³طھط·ظٹظ„
+            cv2.rectangle(frame, (x1, y1), (x2, y2), color_box, 2)
+
+            # ظƒطھط§ط¨ط© ط§ط³ظ… object
+            cv2.putText(frame, f"{label} {conf:.2f}", (x1, y1 - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, color_box, 2)
+
+        if person_count > 1:
+            multiple_persons_yolo = True
+
+        # =========================
+        # ALERT SYSTEM
+        # =========================
+        if len(faces) == 0:
+            warning = "No Person Detected"
+            color = (0, 0, 255)
+
+        elif len(faces) > settings.MAX_FACES_ALLOWED:
+            warning = "Multiple People Detected"
+            color = (0, 0, 255)
+
+        elif phone_detected:
+            warning = "Phone Detected"
+            color = (0, 0, 255)
+
+        elif multiple_persons_yolo:
+            warning = "Multiple Persons (YOLO)"
+            color = (0, 0, 255)
+
+        elif cheating:
+            warning = "Cheating: Looking Away"
+            color = (0, 0, 255)
+
+        elif eye_cheating:
+            warning = "Cheating: Eye Tracking"
+            color = (0, 0, 255)
+
+        elif speech_cheating:
+            warning = "Speech Detection"
+            color = (0, 0, 255)
+
+        else:
+            warning = "Normal"
+            color = (0, 255, 0)
+
+        # =========================
+        # UI DISPLAY
+        # =========================
+        cv2.rectangle(frame, (10, 10), (600, 160), (0, 0, 0), -1)
+
+        cv2.putText(frame, warning, (20, 45),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
+
+        cv2.putText(frame, f"Head Dir: {direction}", (20, 85),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+
+        cv2.putText(frame, f"Eye Dir: {eye_dir}", (300, 85),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+
+        cv2.putText(frame, f"Faces: {len(faces)}", (500, 85),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+
+        # ط§ظ„طµظˆطھ
+        speech_text = "Yes" if is_speaking else "No"
+        cv2.putText(frame, f"Voice: {speech_text}", (500, 125),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0) if not is_speaking else (0, 0, 255), 2)
+
+        # ط§ظ„ظˆظ‚طھ ظ„ظ„ط±ط£ط³
+        if pose_logic.look_start_time:
+            elapsed = time.time() - pose_logic.look_start_time
+        else:
+            elapsed = 0
+
+        cv2.putText(frame, f"Head Time: {round(elapsed,1)}s", (20, 125),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+
+        # ط§ظ„ظˆظ‚طھ ظ„ظ„ط¹ظٹظ†
+        if eye_logic.look_start_time:
+            eye_elapsed = time.time() - eye_logic.look_start_time
+        else:
+            eye_elapsed = 0
+
+        cv2.putText(frame, f"Eye Time: {round(eye_elapsed,1)}s", (300, 125),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+
+        # =========================
+        # SCREENSHOT SYSTEM
+        # =========================
+        # if warning != "Normal" and warning != "Speech Detection" and warning != previous_warning:
+        #     import os
+        #     if not os.path.exists("evidence"):
+        #         os.makedirs("evidence")
+        #     timestamp = time.strftime("%Y%m%d-%H%M%S")
+        #     filename = f"evidence/cheat_{timestamp}.jpg"
+        #     capture_frame = frame.copy()
+        #     cv2.imwrite(filename, capture_frame)
+            
+        previous_warning = warning
+
+        cv2.imshow("AI Proctoring System", frame)
+
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    speech_detector.stop()
+    cap.release()
+    cv2.destroyAllWindows()
+
+
+if __name__ == "__main__":
+    main()
+
+=== END ===
+
+=== PATH: python-ai/requirements.txt ===
+# FastAPI and WebSocket
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+websockets==12.0
+python-multipart==0.0.6
+
+# Computer Vision
+opencv-python==4.8.1.78
+mediapipe==0.10.14
+ultralytics==8.0.221
+
+# Audio Processing
+# webrtcvad==2.0.10 (build fails on Windows without C++ tools)
+webrtcvad-wheels
+# pyaudio==0.2.11
+# pip install pipwin
+# pipwin install pyaudio
+
+# ML/AI
+numpy==1.26.2
+torch==2.1.1
+torchvision==0.16.1
+
+# Utilities
+pydantic==2.5.2
+python-dotenv==1.0.0
+
+=== END ===
+
+=== PATH: python-ai/.env ===
+# =========================
+# GENERAL SETTINGS
+# =========================
+CAMERA_INDEX=0
+FRAME_WIDTH=640
+FRAME_HEIGHT=480
+
+# =========================
+# FACE DETECTION
+# =========================
+FACE_CONFIDENCE=0.70
+MAX_FACES_ALLOWED=1
+
+# =========================
+# HEAD POSE
+# =========================
+LOOK_LEFT_THRESHOLD=-20
+LOOK_RIGHT_THRESHOLD=20
+LOOK_UP_THRESHOLD=20
+LOOK_DOWN_THRESHOLD=-20
+MAX_LOOK_AWAY_TIME=3.0
+
+# =========================
+# EYE TRACKING
+# =========================
+EYE_LOOK_AWAY_TIME=3.0
+EYE_H_THRESHOLD=0.12
+EYE_V_THRESHOLD=0.10
+
+# =========================
+# SPEECH DETECTION
+# =========================
+SPEECH_TIME_LIMIT=2.0
+SPEECH_CONFIDENCE_THRESHOLD=0.5
+
+# =========================
+# OBJECT DETECTION
+# =========================
+DETECT_PHONE=true
+DETECT_PERSON=true
+PHONE_CLASS_NAME=cell phone
+PERSON_CLASS_NAME=person
+
+# =========================
+# ALERT SYSTEM
+# =========================
+ENABLE_ALERTS=true
+SHOW_WARNINGS=true
+
+# =========================
+# TIMERS
+# =========================
+NO_FACE_TIME_LIMIT=5
+MULTIPLE_FACES_TIME_LIMIT=3
+# url for ui =https://heroui.com/themes?chroma=0.11&hue=33&lightness=0.64&base=0.004009775883135198&template=dashboard&fontFamily=fraunces&formRadius=extra-large
+=== END ===
+
+=== PATH: python-ai/__init__.py ===
+# AI Proctoring System Python Module
+
+=== END ===
+
+=== PATH: python-ai/config/__init__.py ===
+# Configuration module
+from .settings import *
+
+=== END ===
+
+=== PATH: python-ai/config/settings.py ===
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# =========================
+# GENERAL SETTINGS
+# =========================
+
+CAMERA_INDEX = int(os.environ.get("CAMERA_INDEX", 0))
+FRAME_WIDTH = int(os.environ.get("FRAME_WIDTH", 640))
+FRAME_HEIGHT = int(os.environ.get("FRAME_HEIGHT", 480))
+
+# =========================
+# FACE DETECTION
+# =========================
+
+FACE_CONFIDENCE = float(os.environ.get("FACE_CONFIDENCE", 0.70))
+MAX_FACES_ALLOWED = int(os.environ.get("MAX_FACES_ALLOWED", 1))
+
+# =========================
+# HEAD POSE (LOOKING)
+# =========================
+
+LOOK_LEFT_THRESHOLD = float(os.environ.get("LOOK_LEFT_THRESHOLD", -20))
+LOOK_RIGHT_THRESHOLD = float(os.environ.get("LOOK_RIGHT_THRESHOLD", 20))
+LOOK_UP_THRESHOLD = float(os.environ.get("LOOK_UP_THRESHOLD", 20))
+LOOK_DOWN_THRESHOLD = float(os.environ.get("LOOK_DOWN_THRESHOLD", -20))
+
+MAX_LOOK_AWAY_TIME = float(os.environ.get("MAX_LOOK_AWAY_TIME", 0.5))
+
+# =========================
+# EYE TRACKING (LOOKING)
+# =========================
+
+EYE_LOOK_AWAY_TIME = float(os.environ.get("EYE_LOOK_AWAY_TIME", 2.0))
+EYE_H_THRESHOLD = float(os.environ.get("EYE_H_THRESHOLD", 0.12))
+EYE_V_THRESHOLD = float(os.environ.get("EYE_V_THRESHOLD", 0.10))
+
+# =========================
+# SPEECH DETECTION
+# =========================
+
+SPEECH_TIME_LIMIT = float(os.environ.get("SPEECH_TIME_LIMIT", 2.0))
+SPEECH_CONFIDENCE_THRESHOLD = float(os.environ.get("SPEECH_CONFIDENCE_THRESHOLD", 0.5))
+
+# =========================
+# OBJECT DETECTION
+# =========================
+
+DETECT_PHONE = os.environ.get("DETECT_PHONE", "true").lower() == "true"
+DETECT_PERSON = os.environ.get("DETECT_PERSON", "true").lower() == "true"
+
+PHONE_CLASS_NAME = os.environ.get("PHONE_CLASS_NAME", "cell phone")
+PERSON_CLASS_NAME = os.environ.get("PERSON_CLASS_NAME", "person")
+
+# =========================
+# ALERT SYSTEM
+# =========================
+
+ENABLE_ALERTS = os.environ.get("ENABLE_ALERTS", "true").lower() == "true"
+SHOW_WARNINGS = os.environ.get("SHOW_WARNINGS", "true").lower() == "true"
+
+# =========================
+# TIMERS
+# =========================
+
+NO_FACE_TIME_LIMIT = int(os.environ.get("NO_FACE_TIME_LIMIT", 5))
+MULTIPLE_FACES_TIME_LIMIT = int(os.environ.get("MULTIPLE_FACES_TIME_LIMIT", 3))
+
+=== END ===
+
+=== PATH: python-ai/modules/__init__.py ===
+# AI Proctoring modules
+from .face_detection import FaceDetector
+from .head_pose import HeadPoseEstimator
+from .head_pose_logic import HeadPoseLogic
+from .eye_tracking import EyeTracker
+from .eye_tracking_logic import EyeTrackingLogic
+from .speech_detection import SpeechDetector
+from .speech_logic import SpeechLogic
+from .object_detection import ObjectDetector
+
+=== END ===
+
+=== PATH: python-ai/modules/face_detection.py ===
+import cv2
+import mediapipe as mp
+
+class FaceDetector:
+    def __init__(self, confidence=0.5):
+        self.mp_face = mp.solutions.face_detection
+        self.detector = self.mp_face.FaceDetection(min_detection_confidence=confidence)
+
+    def detect_faces(self, frame):
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        results = self.detector.process(rgb_frame)
+
+        faces = []
+
+        if results.detections:
+            for detection in results.detections:
+                bbox = detection.location_data.relative_bounding_box
+                h, w, _ = frame.shape
+
+                x = int(bbox.xmin * w)
+                y = int(bbox.ymin * h)
+                width = int(bbox.width * w)
+                height = int(bbox.height * h)
+                # Discard too small detections that are likely wall decorations or ghosts 
+                # Dropped to 45px to support wide-angle webcams and students leaning backward comfortably.
+                if width > 45 and height > 45:
+                    faces.append((x, y, width, height))
+
+        return faces
+
+=== END ===
+
+=== PATH: python-ai/modules/head_pose.py ===
+import cv2
+import mediapipe as mp
+from config import settings
+
+class HeadPoseEstimator:
+    def __init__(self):
+        self.mp_face_mesh = mp.solutions.face_mesh
+        self.face_mesh = self.mp_face_mesh.FaceMesh(
+            min_detection_confidence=0.5,
+            min_tracking_confidence=0.5
+        )
+        self.calibrated = False
+        self.calibration_frames = 0
+        self.yaw_sum = 0.0
+        self.pitch_sum = 0.0
+        self.baseline_yaw = 0.0
+        self.baseline_pitch = 0.0
+
+    def reset(self):
+        self.calibrated = False
+        self.calibration_frames = 0
+        self.yaw_sum = 0.0
+        self.pitch_sum = 0.0
+        self.baseline_yaw = 0.0
+        self.baseline_pitch = 0.0
+
+    def get_pose(self, frame):
+        import math
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        results = self.face_mesh.process(rgb_frame)
+
+        if results.multi_face_landmarks:
+            for face_landmarks in results.multi_face_landmarks:
+                head_right = face_landmarks.landmark[234] 
+                head_left = face_landmarks.landmark[454]  
+                head_top = face_landmarks.landmark[10]    
+                head_bottom = face_landmarks.landmark[152] 
+                
+                dx = head_left.x - head_right.x
+                dz = head_left.z - head_right.z
+                yaw = math.degrees(math.atan2(dz, dx))
+                
+                dy_pitch = head_bottom.y - head_top.y
+                dz_pitch = head_bottom.z - head_top.z
+                pitch = math.degrees(math.atan2(dz_pitch, dy_pitch))
+                
+                if not self.calibrated:
+                    self.yaw_sum += yaw
+                    self.pitch_sum += pitch
+                    self.calibration_frames += 1
+                    if self.calibration_frames >= 10:
+                        self.baseline_yaw = self.yaw_sum / 10.0
+                        self.baseline_pitch = self.pitch_sum / 10.0
+                        self.calibrated = True
+                    return "Calibrating...", yaw
+
+                diff_yaw = yaw - self.baseline_yaw
+                diff_pitch = pitch - self.baseline_pitch
+
+                if diff_yaw < settings.LOOK_LEFT_THRESHOLD:
+                    direction = "Looking Right"
+                elif diff_yaw > settings.LOOK_RIGHT_THRESHOLD:
+                    direction = "Looking Left"
+                elif diff_pitch > settings.LOOK_UP_THRESHOLD:
+                    direction = "Looking Down"
+                elif diff_pitch < settings.LOOK_DOWN_THRESHOLD:
+                    direction = "Looking Up"
+                else:
+                    direction = "Forward"
+
+                return direction, yaw
+
+        return "No Face", 0
+
+=== END ===
+
+=== PATH: python-ai/modules/head_pose_logic.py ===
+import time
+from config import settings
+
+class HeadPoseLogic:
+    def __init__(self):
+        self.look_start_time = None
+        self.cheating = False
+
+    def reset(self):
+        self.look_start_time = None
+        self.cheating = False
+
+    def update(self, direction):
+        if direction in ["Calibrating...", "Forward", "No Face"]:
+            self.look_start_time = None
+            self.cheating = False
+        else:
+            if self.look_start_time is None:
+                self.look_start_time = time.time()
+                
+            elapsed = time.time() - self.look_start_time
+            if elapsed >= settings.MAX_LOOK_AWAY_TIME:
+                self.cheating = True
+                
+        return self.cheating
+
+=== END ===
+
+=== PATH: python-ai/modules/eye_tracking.py ===
+import cv2
+import mediapipe as mp
+import time
+from config import settings
+
+class EyeTracker:
+    def __init__(self):
+        # We must use refine_landmarks=True to get iris points
+        self.face_mesh = mp.solutions.face_mesh.FaceMesh(
+            min_detection_confidence=0.5,
+            min_tracking_confidence=0.5,
+            refine_landmarks=True
+        )
+        self.calibrated = False
+        self.calibration_frames = 0
+        
+        self.h_ratio_sum = 0.0
+        self.v_ratio_sum = 0.0
+        
+        self.baseline_h_ratio = 0.0
+        self.baseline_v_ratio = 0.0
+        
+        self.smoothed_h = None
+        self.smoothed_v = None
+        self.alpha = 0.15 # ظ…ط¹ط¯ظ„ طھظ†ط¹ظٹظ… ظ‚ظˆظٹ ظ„ظ…ظ†ط¹ ط§ظ„طھط´طھطھ
+
+    def reset(self):
+        self.calibrated = False
+        self.calibration_frames = 0
+        self.h_ratio_sum = 0.0
+        self.v_ratio_sum = 0.0
+        self.baseline_h_ratio = 0.0
+        self.baseline_v_ratio = 0.0
+        self.smoothed_h = None
+        self.smoothed_v = None
+
+    def get_eye_direction(self, frame):
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        results = self.face_mesh.process(rgb_frame)
+
+        if results.multi_face_landmarks:
+            for face_landmarks in results.multi_face_landmarks:
+                landmarks = face_landmarks.landmark
+                
+                # Right Eye (Viewer's left)
+                # Outer: 33, Inner: 133, Top: 159, Bottom: 145, Iris center: 468
+                r_inner = landmarks[133]
+                r_outer = landmarks[33]
+                r_top = landmarks[159]
+                r_bottom = landmarks[145]
+                r_iris = landmarks[468]
+
+                # Left Eye (Viewer's right)
+                # Inner: 362, Outer: 263, Top: 386, Bottom: 374, Iris center: 473
+                l_inner = landmarks[362]
+                l_outer = landmarks[263]
+                l_top = landmarks[386]
+                l_bottom = landmarks[374]
+                l_iris = landmarks[473]
+
+                # --- Horizontal Ratio (Average of both eyes) ---
+                # Right eye width (inner x > outer x)
+                r_width = r_inner.x - r_outer.x
+                r_h_offset = r_iris.x - r_outer.x
+                r_h_ratio = r_h_offset / r_width if r_width != 0 else 0.5
+                
+                # Left eye width (outer x > inner x)
+                l_width = l_outer.x - l_inner.x
+                l_h_offset = l_iris.x - l_inner.x
+                l_h_ratio = l_h_offset / l_width if l_width != 0 else 0.5
+                
+                # Notice left eye geometry is mirrored, so we match their logical movement
+                h_ratio = (r_h_ratio + l_h_ratio) / 2.0
+
+                # --- Vertical Ratio (Average of both eyes) ---
+                r_height = r_bottom.y - r_top.y
+                r_v_offset = r_iris.y - r_top.y
+                r_v_ratio = r_v_offset / r_height if r_height != 0 else 0.5
+                
+                l_height = l_bottom.y - l_top.y
+                l_v_offset = l_iris.y - l_top.y
+                l_v_ratio = l_v_offset / l_height if l_height != 0 else 0.5
+                
+                v_ratio = (r_v_ratio + l_v_ratio) / 2.0
+
+                # طھط·ط¨ظٹظ‚ ظ†ط¸ط§ظ… ط§ظ„طھظ†ط¹ظٹظ… ط§ظ„ط°ظƒظٹ (Moving Average)
+                if self.smoothed_h is None:
+                    self.smoothed_h = h_ratio
+                    self.smoothed_v = v_ratio
+                else:
+                    self.smoothed_h = self.smoothed_h * (1 - self.alpha) + h_ratio * self.alpha
+                    self.smoothed_v = self.smoothed_v * (1 - self.alpha) + v_ratio * self.alpha
+
+                # Auto Calibration logic for longer baseline 
+                if not self.calibrated:
+                    self.h_ratio_sum += self.smoothed_h
+                    self.v_ratio_sum += self.smoothed_v
+                    self.calibration_frames += 1
+                    if self.calibration_frames >= 10:
+                        self.baseline_h_ratio = self.h_ratio_sum / 10.0
+                        self.baseline_v_ratio = self.v_ratio_sum / 10.0
+                        self.calibrated = True
+                    return "Calibrating..."
+
+                diff_h = self.smoothed_h - self.baseline_h_ratio
+                diff_v = self.smoothed_v - self.baseline_v_ratio
+
+                # thresholds usually around 0.05 to 0.08 difference for a clear glance away
+                if diff_h < -settings.EYE_H_THRESHOLD:
+                    direction = "Looking Right"
+                elif diff_h > settings.EYE_H_THRESHOLD:
+                    direction = "Looking Left"
+                elif diff_v < -settings.EYE_V_THRESHOLD:
+                    direction = "Looking Up"
+                elif diff_v > settings.EYE_V_THRESHOLD:
+                    direction = "Looking Down"
+                else:
+                    direction = "Forward"
+
+                return direction
+
+        return "No Face"
+
+=== END ===
+
+=== PATH: python-ai/modules/eye_tracking_logic.py ===
+import time
+from config import settings
+
+class EyeTrackingLogic:
+    def __init__(self):
+        self.look_start_time = None
+        self.cheating = False
+
+    def reset(self):
+        self.look_start_time = None
+        self.cheating = False
+
+    def update(self, direction):
+        # ظ„ظˆ ط¨ظٹط¨طµ ط¨ط¹ظٹط¯ ط£ظˆ ط§ظ„ظƒط§ظ…ظٹط±ط§ ظ…ظ„ظ‚ط·طھط´ ط¹ظٹظ†ظ‡
+        if direction not in ["Forward", "Calibrating...", "No Face"]:
+            if self.look_start_time is None:
+                self.look_start_time = time.time()
+
+            elapsed = time.time() - self.look_start_time
+
+            if elapsed >= settings.EYE_LOOK_AWAY_TIME:
+                self.cheating = True
+            else:
+                self.cheating = False
+
+        # ظ„ظˆ ط±ط¬ط¹ ظٹط¨طµ ظ‚ط¯ط§ظ…
+        else:
+            self.look_start_time = None
+            self.cheating = False
+
+        return self.cheating
+
+=== END ===
+
+=== PATH: python-ai/modules/object_detection.py ===
+# modules/object_detection.py
+
+from ultralytics import YOLO
+
+class ObjectDetector:
+    def __init__(self):
+        try:
+            self.model = YOLO("yolov8s.pt")
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to load YOLO model 'yolov8s.pt'. "
+                f"Ensure the model file exists or you have internet to download it. Error: {e}"
+            )
+
+    def detect(self, frame):
+        # 0: person, 67: cell phone
+        # iou=0.4 â†’ aggressive NMS to avoid counting the same person twice
+        results = self.model(frame, conf=0.25, classes=[0, 67], iou=0.4, verbose=False)
+
+        detections = []
+
+        for r in results:
+            for box in r.boxes:
+                cls_id = int(box.cls[0])
+                label = self.model.names[cls_id]
+                conf = float(box.conf[0])
+
+                if label == "person" and conf < 0.45:
+                    continue
+                if label == "cell phone" and conf < 0.45:
+                    continue
+
+                x1, y1, x2, y2 = map(int, box.xyxy[0])
+
+                detections.append({
+                    "label": label,
+                    "confidence": conf,
+                    "box": (x1, y1, x2, y2)
+                })
+
+        return detections
+
+=== END ===
+
+=== PATH: python-ai/modules/speech_detection.py ===
+import webrtcvad
+import time
+import struct
+import math
+from config import settings
+
+def get_rms(chunk):
+    count = len(chunk) // 2
+    if count == 0: return 0
+    fmt = f"<{count}h"
+    samples = struct.unpack(fmt, chunk)
+    sum_squares = sum((s ** 2) for s in samples)
+    return math.sqrt(sum_squares / count)
+
+class SpeechDetector:
+    def __init__(self):
+        self.vad = webrtcvad.Vad(3) # Mode 3 is the most aggressive, strictly filters background noise/clicks and only detects human speech
+        self.RATE = 16000
+        self.is_human_speaking = False
+        self.last_speech_time = 0
+
+    def reset(self):
+        self.is_human_speaking = False
+        self.last_speech_time = 0
+
+    def process_audio_chunk(self, audio_bytes):
+        try:
+            # Webrtcvad expects frames of 10, 20, or 30 ms.
+            # At 16000 Hz, 30 ms is 480 samples = 960 bytes (16-bit PCM).
+            chunk_size = 960
+            
+            speech_detected = False
+            for i in range(0, len(audio_bytes), chunk_size):
+                chunk = audio_bytes[i:i+chunk_size]
+                if len(chunk) == chunk_size:
+                    if self.vad.is_speech(chunk, self.RATE):
+                        rms = get_rms(chunk)
+                        if rms > 150:
+                            speech_detected = True
+                            break
+
+            if speech_detected:
+                self.last_speech_time = time.time()
+                
+            # Restore 1.0s decay. Humans pause for breath; shorter decays break continuous speech and prevent 2-second triggers.
+            self.is_human_speaking = (time.time() - self.last_speech_time) < 1.0
+            
+            return self.is_human_speaking
+        except Exception as e:
+            print(f"Error processing audio chunk: {e}")
+            return self.is_human_speaking
+
+    def get_speech_status(self):
+        self.is_human_speaking = (time.time() - self.last_speech_time) < 1.0
+        return self.is_human_speaking
+
+=== END ===
+
+=== PATH: python-ai/modules/speech_logic.py ===
+import time
+from config import settings
+
+class SpeechLogic:
+    def __init__(self):
+        self.speech_start_time = None
+        self.cheating = False
+
+    def reset(self):
+        self.speech_start_time = None
+        self.cheating = False
+
+    def update(self, is_speaking):
+        if is_speaking:
+            if self.speech_start_time is None:
+                self.speech_start_time = time.time()
+                
+            elapsed = time.time() - self.speech_start_time
+            if elapsed >= settings.SPEECH_TIME_LIMIT:
+                self.cheating = True
+        else:
+            self.speech_start_time = None
+            self.cheating = False
+            
+        return self.cheating
+
+=== END ===
+

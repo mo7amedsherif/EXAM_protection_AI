@@ -1,0 +1,1432 @@
+{
+	"info": {
+		"_postman_id": "ai-proctor-backend-v3",
+		"name": "AI Proctor Backend API - Updated",
+		"description": "Complete API collection for AI Proctor backend testing with all current endpoints including authentication, exams, questions, results, cheating logs, and code execution",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "🔐 Authentication",
+			"item": [
+				{
+					"name": "Register Student",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const response = pm.response.json();",
+									"    pm.environment.set(\"studentToken\", response.token);",
+									"    pm.environment.set(\"studentId\", response._id);",
+									"    pm.environment.set(\"studentEmail\", response.email);",
+									"}",
+									"",
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"Response has required fields\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('_id');",
+									"    pm.expect(jsonData).to.have.property('token');",
+									"    pm.expect(jsonData).to.have.property('name');",
+									"    pm.expect(jsonData).to.have.property('email');",
+									"    pm.expect(jsonData).to.have.property('role');",
+									"    pm.expect(jsonData.role).to.eql('student');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Alice Student\",\n    \"email\": \"alice.student@example.com\",\n    \"password\": \"student123\",\n    \"role\": \"student\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/users/register",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "users", "register"]
+						},
+						"description": "Register a new student account"
+					}
+				},
+				{
+					"name": "Register Teacher",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const response = pm.response.json();",
+									"    pm.environment.set(\"teacherToken\", response.token);",
+									"    pm.environment.set(\"teacherId\", response._id);",
+									"    pm.environment.set(\"teacherEmail\", response.email);",
+									"}",
+									"",
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"Response has required fields\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('_id');",
+									"    pm.expect(jsonData).to.have.property('token');",
+									"    pm.expect(jsonData).to.have.property('name');",
+									"    pm.expect(jsonData).to.have.property('email');",
+									"    pm.expect(jsonData).to.have.property('role');",
+									"    pm.expect(jsonData.role).to.eql('teacher');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Bob Teacher\",\n    \"email\": \"bob.teacher@example.com\",\n    \"password\": \"teacher123\",\n    \"role\": \"teacher\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/users/register",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "users", "register"]
+						},
+						"description": "Register a new teacher account"
+					}
+				},
+				{
+					"name": "Login Student",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    pm.environment.set(\"studentToken\", response.token);",
+									"    pm.environment.set(\"studentId\", response._id);",
+									"    pm.environment.set(\"studentRole\", response.role);",
+									"}",
+									"",
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has token\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('token');",
+									"    pm.expect(jsonData.role).to.eql('student');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"alice.student@example.com\",\n    \"password\": \"student123\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/users/login",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "users", "login"]
+						},
+						"description": "Login as student"
+					}
+				},
+				{
+					"name": "Login Teacher",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    pm.environment.set(\"teacherToken\", response.token);",
+									"    pm.environment.set(\"teacherId\", response._id);",
+									"    pm.environment.set(\"teacherRole\", response.role);",
+									"}",
+									"",
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has token\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('token');",
+									"    pm.expect(jsonData.role).to.eql('teacher');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"bob.teacher@example.com\",\n    \"password\": \"teacher123\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/users/login",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "users", "login"]
+						},
+						"description": "Login as teacher"
+					}
+				},
+				{
+					"name": "Get Student Profile",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has user data\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('_id');",
+									"    pm.expect(jsonData).to.have.property('name');",
+									"    pm.expect(jsonData).to.have.property('email');",
+									"    pm.expect(jsonData).to.have.property('role');",
+									"    pm.expect(jsonData).to.not.have.property('password');",
+									"    pm.expect(jsonData.role).to.eql('student');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{studentToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/users/me",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "users", "me"]
+						},
+						"description": "Get current student profile"
+					}
+				},
+				{
+					"name": "Get Teacher Profile",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has user data\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('_id');",
+									"    pm.expect(jsonData).to.have.property('name');",
+									"    pm.expect(jsonData).to.have.property('email');",
+									"    pm.expect(jsonData).to.have.property('role');",
+									"    pm.expect(jsonData).to.not.have.property('password');",
+									"    pm.expect(jsonData.role).to.eql('teacher');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{teacherToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/users/me",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "users", "me"]
+						},
+						"description": "Get current teacher profile"
+					}
+				}
+			],
+			"description": "User authentication endpoints"
+		},
+		{
+			"name": "📝 Exams",
+			"item": [
+				{
+					"name": "Create Exam",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const response = pm.response.json();",
+									"    pm.environment.set(\"examId\", response._id);",
+									"}",
+									"",
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"Response has exam data\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('_id');",
+									"    pm.expect(jsonData).to.have.property('title');",
+									"    pm.expect(jsonData).to.have.property('duration');",
+									"    pm.expect(jsonData).to.have.property('teacher');",
+									"    pm.expect(jsonData).to.have.property('isActive');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{teacherToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"title\": \"JavaScript Fundamentals Test\",\n    \"description\": \"Comprehensive test covering basic JavaScript concepts, data types, functions, and DOM manipulation\",\n    \"duration\": 90\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/exams",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "exams"]
+						},
+						"description": "Create a new exam (teacher only)"
+					}
+				},
+				{
+					"name": "Get All Exams (Teacher)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response is array\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.be.an('array');",
+									"});",
+									"",
+									"pm.test(\"Exams belong to teacher\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    if (jsonData.length > 0) {",
+									"        jsonData.forEach(exam => {",
+									"            pm.expect(exam.teacher).to.eql(pm.environment.get(\"teacherId\"));",
+									"        });",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{teacherToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/exams",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "exams"]
+						},
+						"description": "Get all exams created by the teacher"
+					}
+				},
+				{
+					"name": "Get All Exams (Student)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response is array\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.be.an('array');",
+									"});",
+									"",
+									"pm.test(\"Exams are active\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    if (jsonData.length > 0) {",
+									"        jsonData.forEach(exam => {",
+									"            pm.expect(exam.isActive).to.be.true;",
+									"            pm.expect(exam).to.have.property('teacher');",
+									"        });",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{studentToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/exams",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "exams"]
+						},
+						"description": "Get all active exams for students"
+					}
+				},
+				{
+					"name": "Get Exam by ID",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has exam data\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('_id');",
+									"    pm.expect(jsonData).to.have.property('title');",
+									"    pm.expect(jsonData).to.have.property('duration');",
+									"    pm.expect(jsonData).to.have.property('teacher');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{teacherToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/exams/{{examId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "exams", "{{examId}}"]
+						},
+						"description": "Get specific exam details"
+					}
+				},
+				{
+					"name": "Update Exam",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has updated exam data\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('_id');",
+									"    pm.expect(jsonData).to.have.property('title');",
+									"    pm.expect(jsonData.title).to.include('Updated');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{teacherToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"title\": \"JavaScript Fundamentals Test - Updated\",\n    \"description\": \"Updated comprehensive test covering basic JavaScript concepts, data types, functions, and DOM manipulation\",\n    \"duration\": 120,\n    \"isActive\": true\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/exams/{{examId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "exams", "{{examId}}"]
+						},
+						"description": "Update exam details (teacher only)"
+					}
+				},
+				{
+					"name": "Delete Exam",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has success message\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('message');",
+									"    pm.expect(jsonData.message).to.include('deleted');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{teacherToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/exams/{{examId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "exams", "{{examId}}"]
+						},
+						"description": "Delete exam and all its questions (teacher only)"
+					}
+				}
+			],
+			"description": "Exam management endpoints"
+		},
+		{
+			"name": "❓ Questions",
+			"item": [
+				{
+					"name": "Add Question to Exam",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const response = pm.response.json();",
+									"    pm.environment.set(\"questionId\", response._id);",
+									"}",
+									"",
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"Response has question data\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('_id');",
+									"    pm.expect(jsonData).to.have.property('text');",
+									"    pm.expect(jsonData).to.have.property('options');",
+									"    pm.expect(jsonData).to.have.property('correctOption');",
+									"    pm.expect(jsonData).to.have.property('marks');",
+									"    pm.expect(jsonData.options).to.have.length(4);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{teacherToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"text\": \"What is the correct way to declare a variable in modern JavaScript?\",\n    \"options\": [\"let x = 5;\", \"var x = 5;\", \"variable x = 5;\", \"declare x = 5;\"],\n    \"correctOption\": 0,\n    \"marks\": 2\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/exams/{{examId}}/questions",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "exams", "{{examId}}", "questions"]
+						},
+						"description": "Add a question to an exam (teacher only)"
+					}
+				},
+				{
+					"name": "Get All Questions for Exam (Teacher)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response is array\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.be.an('array');",
+									"});",
+									"",
+									"pm.test(\"Questions have correct answers visible to teacher\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    if (jsonData.length > 0) {",
+									"        jsonData.forEach(question => {",
+									"            pm.expect(question).to.have.property('correctOption');",
+									"            pm.expect(question).to.have.property('options');",
+									"            pm.expect(question.options).to.have.length(4);",
+									"        });",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{teacherToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/exams/{{examId}}/questions",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "exams", "{{examId}}", "questions"]
+						},
+						"description": "Get all questions for an exam with correct answers (teacher only)"
+					}
+				},
+				{
+					"name": "Get All Questions for Exam (Student)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response is array\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.be.an('array');",
+									"});",
+									"",
+									"pm.test(\"Students should not see correct answers\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    if (jsonData.length > 0) {",
+									"        jsonData.forEach(question => {",
+									"            pm.expect(question).to.not.have.property('correctOption');",
+									"            pm.expect(question).to.have.property('options');",
+									"            pm.expect(question.options).to.have.length(4);",
+									"        });",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{studentToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/exams/{{examId}}/questions",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "exams", "{{examId}}", "questions"]
+						},
+						"description": "Get all questions for an exam without correct answers (student view)"
+					}
+				},
+				{
+					"name": "Delete Question",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has success message\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('message');",
+									"    pm.expect(jsonData.message).to.include('deleted');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{teacherToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/exams/{{examId}}/questions/{{questionId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "exams", "{{examId}}", "questions", "{{questionId}}"]
+						},
+						"description": "Delete a question from exam (teacher only)"
+					}
+				},
+				{
+					"name": "Create Standalone Question",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"Response has question data\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('_id');",
+									"    pm.expect(jsonData).to.have.property('text');",
+									"    pm.expect(jsonData).to.have.property('options');",
+									"    pm.expect(jsonData).to.have.property('correctOption');",
+									"    pm.expect(jsonData).to.have.property('marks');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{teacherToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"exam\": \"{{examId}}\",\n    \"text\": \"What is the output of typeof null in JavaScript?\",\n    \"options\": [\"null\", \"undefined\", \"object\", \"number\"],\n    \"correctOption\": 2,\n    \"marks\": 1\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/questions",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "questions"]
+						},
+						"description": "Create a standalone question (teacher only)"
+					}
+				},
+				{
+					"name": "Get Single Question",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has question data\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('_id');",
+									"    pm.expect(jsonData).to.have.property('text');",
+									"    pm.expect(jsonData).to.have.property('options');",
+									"    pm.expect(jsonData.options).to.have.length(4);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{teacherToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/questions/{{questionId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "questions", "{{questionId}}"]
+						},
+						"description": "Get a single question by ID"
+					}
+				},
+				{
+					"name": "Update Question",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has updated question data\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('_id');",
+									"    pm.expect(jsonData).to.have.property('text');",
+									"    pm.expect(jsonData.marks).to.eql(2);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{teacherToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"text\": \"What is the output of typeof null in JavaScript? (Updated)\",\n    \"options\": [\"null\", \"undefined\", \"object\", \"number\"],\n    \"correctOption\": 2,\n    \"marks\": 2\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/questions/{{questionId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "questions", "{{questionId}}"]
+						},
+						"description": "Update question details (teacher only)"
+					}
+				},
+				{
+					"name": "Toggle Question Activation",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has activation status\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('isActive');",
+									"    pm.expect(jsonData).to.have.property('message');",
+									"    pm.expect(jsonData.message).to.include('activated').or.include('deactivated');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{teacherToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/questions/{{questionId}}/activate",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "questions", "{{questionId}}", "activate"]
+						},
+						"description": "Toggle question active/inactive status (teacher only)"
+					}
+				}
+			],
+			"description": "Question management endpoints"
+		},
+		{
+			"name": "📊 Results",
+			"item": [
+				{
+					"name": "Submit Exam",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const response = pm.response.json();",
+									"    pm.environment.set(\"resultId\", response._id);",
+									"}",
+									"",
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"Response has result data\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('_id');",
+									"    pm.expect(jsonData).to.have.property('score');",
+									"    pm.expect(jsonData).to.have.property('totalMarks');",
+									"    pm.expect(jsonData).to.have.property('percentage');",
+									"    pm.expect(jsonData).to.have.property('submittedAt');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{studentToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"examId\": \"{{examId}}\",\n    \"answers\": [\n        {\n            \"question\": \"{{questionId}}\",\n            \"selectedOption\": 0\n        }\n    ]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/results",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "results"]
+						},
+						"description": "Submit exam answers (student only)"
+					}
+				},
+				{
+					"name": "Get My Results",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response is array\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.be.an('array');",
+									"});",
+									"",
+									"pm.test(\"Results have required fields\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    if (jsonData.length > 0) {",
+									"        jsonData.forEach(result => {",
+									"            pm.expect(result).to.have.property('score');",
+									"            pm.expect(result).to.have.property('totalMarks');",
+									"            pm.expect(result).to.have.property('percentage');",
+									"            pm.expect(result).to.have.property('exam');",
+									"            pm.expect(result).to.have.property('submittedAt');",
+									"        });",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{studentToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/results/my",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "results", "my"]
+						},
+						"description": "Get current student's results"
+					}
+				},
+				{
+					"name": "Get Exam Results",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response is array\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.be.an('array');",
+									"});",
+									"",
+									"pm.test(\"Results have student data\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    if (jsonData.length > 0) {",
+									"        jsonData.forEach(result => {",
+									"            pm.expect(result).to.have.property('student');",
+									"            pm.expect(result.student).to.have.property('name');",
+									"            pm.expect(result.student).to.have.property('email');",
+									"            pm.expect(result).to.have.property('score');",
+									"        });",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{teacherToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/results/exam/{{examId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "results", "exam", "{{examId}}"]
+						},
+						"description": "Get all results for a specific exam (teacher only)"
+					}
+				}
+			],
+			"description": "Result management endpoints"
+		},
+		{
+			"name": "🚨 Cheating Logs",
+			"item": [
+				{
+					"name": "Log Cheating Event",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const response = pm.response.json();",
+									"    pm.environment.set(\"cheatingLogId\", response._id);",
+									"}",
+									"",
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"Response has cheating log data\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('_id');",
+									"    pm.expect(jsonData).to.have.property('type');",
+									"    pm.expect(jsonData).to.have.property('severity');",
+									"    pm.expect(jsonData).to.have.property('timestamp');",
+									"    pm.expect(jsonData).to.have.property('student');",
+									"    pm.expect(jsonData).to.have.property('exam');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{studentToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"examId\": \"{{examId}}\",\n    \"type\": \"tab_switch\",\n    \"confidence\": 85,\n    \"description\": \"Student switched to another browser tab during exam\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/cheating-logs",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "cheating-logs"]
+						},
+						"description": "Log a cheating event (student only)"
+					}
+				},
+				{
+					"name": "Log Critical Cheating Event",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"Response has cheating log data\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('_id');",
+									"    pm.expect(jsonData.type).to.eql('phone_detected');",
+									"    pm.expect(jsonData.severity).to.eql('critical');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{studentToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"examId\": \"{{examId}}\",\n    \"type\": \"phone_detected\",\n    \"confidence\": 95,\n    \"description\": \"Mobile phone detected in camera view\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/cheating-logs",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "cheating-logs"]
+						},
+						"description": "Log a critical cheating event (student only)"
+					}
+				},
+				{
+					"name": "Get Exam Cheating Logs",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response is array\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.be.an('array');",
+									"});",
+									"",
+									"pm.test(\"Logs have required fields\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    if (jsonData.length > 0) {",
+									"        jsonData.forEach(log => {",
+									"            pm.expect(log).to.have.property('type');",
+									"            pm.expect(log).to.have.property('severity');",
+									"            pm.expect(log).to.have.property('timestamp');",
+									"            pm.expect(log).to.have.property('student');",
+									"            pm.expect(log.student).to.have.property('name');",
+									"        });",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{teacherToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/cheating-logs/exam/{{examId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "cheating-logs", "exam", "{{examId}}"]
+						},
+						"description": "Get all cheating logs for an exam (teacher only)"
+					}
+				},
+				{
+					"name": "Get Exam Cheating Summary",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response is array\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.be.an('array');",
+									"});",
+									"",
+									"pm.test(\"Summary has required fields\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    if (jsonData.length > 0) {",
+									"        jsonData.forEach(summary => {",
+									"            pm.expect(summary).to.have.property('student');",
+									"            pm.expect(summary).to.have.property('total');",
+									"            pm.expect(summary).to.have.property('critical');",
+									"            pm.expect(summary).to.have.property('high');",
+									"            pm.expect(summary).to.have.property('types');",
+									"            pm.expect(summary.student).to.have.property('name');",
+									"        });",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{teacherToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/cheating-logs/exam/{{examId}}/summary",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "cheating-logs", "exam", "{{examId}}", "summary"]
+						},
+						"description": "Get cheating summary per student for an exam (teacher only)"
+					}
+				},
+				{
+					"name": "Get Student Cheating Logs",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response is array\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.be.an('array');",
+									"});",
+									"",
+									"pm.test(\"Logs belong to specific student\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    if (jsonData.length > 0) {",
+									"        jsonData.forEach(log => {",
+									"            pm.expect(log.student._id).to.eql(pm.environment.get(\"studentId\"));",
+									"        });",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{teacherToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/cheating-logs/exam/{{examId}}/student/{{studentId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "cheating-logs", "exam", "{{examId}}", "student", "{{studentId}}"]
+						},
+						"description": "Get cheating logs for a specific student in an exam (teacher only)"
+					}
+				}
+			],
+			"description": "Cheating detection and monitoring endpoints"
+		},
+		{
+			"name": "🏥 Health Check",
+			"item": [
+				{
+					"name": "API Health",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has status\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('status');",
+									"    pm.expect(jsonData).to.have.property('env');",
+									"    pm.expect(jsonData.status).to.eql('ok');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/api/health",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "health"]
+						},
+						"description": "Check API server health status"
+					}
+				}
+			],
+			"description": "System health check endpoints"
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Set default values if not already set",
+					"if (!pm.environment.get(\"baseUrl\")) {",
+					"    pm.environment.set(\"baseUrl\", \"http://localhost:5000\");",
+					"}",
+					"",
+					"// Log request details for debugging",
+					"console.log(\"=== Pre-request Script ===\");",
+					"console.log(\"Request:\", pm.info.requestName);",
+					"console.log(\"Method:\", pm.info.requestMethod);",
+					"console.log(\"URL:\", pm.info.requestUrl);",
+					"console.log(\"Environment:\", pm.environment.toObject());"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Global test for response time",
+					"pm.test(\"Response time is less than 5000ms\", function () {",
+					"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+					"});",
+					"",
+					"// Log response details for debugging",
+					"console.log(\"=== Test Script ===\");",
+					"console.log(\"Request:\", pm.info.requestName);",
+					"console.log(\"Status:\", pm.response.code);",
+					"console.log(\"Response Time:\", pm.response.responseTime + \"ms\");",
+					"console.log(\"Content-Type:\", pm.response.headers.get('Content-Type'));",
+					"",
+					"// Store response data for debugging",
+					"try {",
+					"    const responseData = pm.response.json();",
+					"    console.log(\"Response Data:\", JSON.stringify(responseData, null, 2));",
+					"} catch (e) {",
+					"    console.log(\"Response is not JSON:\", pm.response.text());",
+					"}"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5000",
+			"type": "string",
+			"description": "Base URL for the API"
+		}
+	]
+}

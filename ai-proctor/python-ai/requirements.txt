@@ -1,0 +1,26 @@
+# FastAPI and WebSocket
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+websockets==12.0
+python-multipart==0.0.6
+
+# Computer Vision
+opencv-python==4.8.1.78
+mediapipe==0.10.14
+ultralytics==8.0.221
+
+# Audio Processing
+# webrtcvad==2.0.10 (build fails on Windows without C++ tools)
+webrtcvad-wheels
+# pyaudio==0.2.11
+# pip install pipwin
+# pipwin install pyaudio
+
+# ML/AI
+numpy==1.26.2
+torch==2.1.1
+torchvision==0.16.1
+
+# Utilities
+pydantic==2.5.2
+python-dotenv==1.0.0
