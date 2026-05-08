@@ -128,7 +128,7 @@ const ExamPage = () => {
               <p className="text-sm text-gray-600">{exam?.title}</p>
             </div>
           </div>
-          <div className="flex items-center gap-8">
+          <div className="flex items-center gap-4">
             <div className="text-right">
               <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Student</p>
               <p className="font-semibold text-gray-900">{user?.name}</p>
@@ -143,6 +143,16 @@ const ExamPage = () => {
               <p className="text-xs uppercase tracking-wider opacity-90 mb-1">Time Remaining</p>
               <p className="text-3xl font-mono font-bold">{formatTime(timeLeft)}</p>
             </div>
+            <button
+              onClick={() => {
+                if (window.confirm('Are you sure you want to exit? Your progress will be lost and the exam will NOT be submitted.')) {
+                  navigate('/student/dashboard');
+                }
+              }}
+              className="border border-red-400 text-red-500 hover:bg-red-50 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors duration-200"
+            >
+              Exit Exam
+            </button>
           </div>
         </div>
       </nav>

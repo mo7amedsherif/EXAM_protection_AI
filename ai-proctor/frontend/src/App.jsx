@@ -9,6 +9,7 @@ import ExamResultsPage from './pages/teacher/ExamResultsPage';
 import CheatLogPage from './pages/teacher/CheatLogPage';
 import StudentDashboard from './pages/student/StudentDashboard';
 import ExamPage from './pages/student/ExamPage';
+import PreExamPage from './pages/student/PreExamPage';
 import ResultPage from './pages/student/ResultPage';
 import useAuthStore from './store/authStore';
 
@@ -88,6 +89,18 @@ function App() {
             <ProtectedRoute>
               {user?.role === 'student' ? (
                 <StudentDashboard />
+              ) : (
+                <Navigate to="/teacher/dashboard" />
+              )}
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/student/exam/:id/pre"
+          element={
+            <ProtectedRoute>
+              {user?.role === 'student' ? (
+                <PreExamPage />
               ) : (
                 <Navigate to="/teacher/dashboard" />
               )}

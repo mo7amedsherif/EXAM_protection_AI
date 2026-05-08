@@ -28,7 +28,7 @@ const StudentDashboard = () => {
   };
 
   const handleStartExam = (examId) => {
-    navigate(`/student/exam/${examId}`);
+    navigate(`/student/exam/${examId}/pre`);
   };
 
   if (loading) return <div className="text-center mt-10">Loading...</div>;
