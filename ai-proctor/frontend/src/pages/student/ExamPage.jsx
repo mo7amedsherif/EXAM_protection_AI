@@ -21,6 +21,8 @@ const ExamPage = () => {
   const [error, setError] = useState('');
   const [showCamera, setShowCamera] = useState(true);
   const [warningModal, setWarningModal] = useState(null);
+  const [systemReady, setSystemReady] = useState(false);
+  const [countdown, setCountdown] = useState(8);
 
   // Keep a ref to the latest handleSubmit so effects never call a stale closure
   const submitRef = useRef(null);
@@ -32,9 +34,31 @@ const ExamPage = () => {
     fetchExamData();
   }, [id]);
 
+  // Grace period countdown
+  useEffect(() => {
+    const timer = setTimeout(() => setSystemReady(true), 8000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (systemReady) return;
+    const interval = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [systemReady]);
+
+  // Exam timer — paused during grace period
   useEffect(() => {
     if (!exam) return;
     const timer = setInterval(() => {
+      if (!systemReady) return;
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
@@ -45,7 +69,7 @@ const ExamPage = () => {
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, [exam]);
+  }, [exam, systemReady]);
 
   const fetchExamData = async () => {
     try {
@@ -113,6 +137,51 @@ const ExamPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-gray-50">
+      {/* Grace period initialization overlay */}
+      {!systemReady && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9998,
+          background: 'rgba(0,0,0,0.75)',
+          display: 'flex', alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: 16,
+            padding: '40px 48px', maxWidth: 400,
+            width: '90%', textAlign: 'center',
+          }}>
+            <div style={{
+              width: 72, height: 72, borderRadius: '50%',
+              background: '#EFF6FF', border: '3px solid #3B82F6',
+              display: 'flex', alignItems: 'center',
+              justifyContent: 'center', margin: '0 auto 20px',
+              fontSize: 28, fontWeight: 700, color: '#1D4ED8',
+            }}>
+              {countdown}
+            </div>
+            <h3 style={{
+              fontSize: 18, fontWeight: 700,
+              color: '#111827', marginBottom: 8,
+            }}>
+              Setting up AI Proctoring…
+            </h3>
+            <p style={{
+              fontSize: 14, color: '#6B7280', marginBottom: 20,
+              lineHeight: 1.6,
+            }}>
+              Please look directly at the camera and stay still.
+              The exam will begin in {countdown} second{countdown !== 1 ? 's' : ''}.
+            </p>
+            <div style={{
+              background: '#F3F4F6', borderRadius: 8,
+              padding: '10px 16px', fontSize: 13, color: '#6B7280',
+            }}>
+              📷 Camera initializing &nbsp;·&nbsp; 🔊 Mic active &nbsp;·&nbsp; 🤖 AI loading
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Navbar */}
       <nav className="bg-white/80 backdrop-blur-md border-b border-gray-200/50 px-8 py-4 sticky top-0 z-50 shadow-sm">
         <div className="flex items-center justify-between">

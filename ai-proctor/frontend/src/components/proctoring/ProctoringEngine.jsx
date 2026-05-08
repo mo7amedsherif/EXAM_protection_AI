@@ -5,6 +5,8 @@ import axios from '../../api/axios';
 const DEBOUNCE_MS = 10000;
 const FRAME_INTERVAL_MS = 500;
 const WS_URL = 'ws://localhost:8000/ws';
+const GRACE_PERIOD_MS = 8000;
+const FULLSCREEN_GRACE_MS = 12000;
 
 const ProctoringEngine = ({ examId, onViolation }) => {
   const webcamRef        = useRef(null);
@@ -16,6 +18,7 @@ const ProctoringEngine = ({ examId, onViolation }) => {
   const violationRef     = useRef({});
   const violationCountRef = useRef(0);
   const previewImgRef    = useRef(null);
+  const examStartTime    = useRef(Date.now());
 
   // ── Debounced violation logger ─────────────────────────────
   const logViolation = useCallback((type, description, confidence = null) => {
@@ -24,16 +27,23 @@ const ProctoringEngine = ({ examId, onViolation }) => {
         now - violationRef.current[type] < DEBOUNCE_MS) return;
     violationRef.current[type] = now;
 
-    violationCountRef.current += 1;
-    const count = violationCountRef.current;
+    const isInGracePeriod =
+      type === 'fullscreen_exit'
+        ? (Date.now() - examStartTime.current) < FULLSCREEN_GRACE_MS
+        : (Date.now() - examStartTime.current) < GRACE_PERIOD_MS;
 
-    if (onViolation) {
-      onViolation({
-        type,
-        description,
-        count,
-        level: count === 1 ? 'warning' : count === 2 ? 'final' : 'terminate',
-      });
+    if (!isInGracePeriod) {
+      violationCountRef.current += 1;
+      const count = violationCountRef.current;
+
+      if (onViolation) {
+        onViolation({
+          type,
+          description,
+          count,
+          level: count === 1 ? 'warning' : count === 2 ? 'final' : 'terminate',
+        });
+      }
     }
 
     axios.post('/cheating-logs', {
