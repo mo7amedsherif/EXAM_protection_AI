@@ -34,25 +34,23 @@ const ExamPage = () => {
     fetchExamData();
   }, [id]);
 
-  // Grace period countdown
-  useEffect(() => {
-    const timer = setTimeout(() => setSystemReady(true), 8000);
-    return () => clearTimeout(timer);
-  }, []);
+  // Grace period countdown (no auto-start — student must click Begin Exam)
+  const [countdownDone, setCountdownDone] = useState(false);
 
   useEffect(() => {
-    if (systemReady) return;
+    if (countdownDone) return;
     const interval = setInterval(() => {
       setCountdown(prev => {
         if (prev <= 1) {
           clearInterval(interval);
+          setCountdownDone(true);
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [systemReady]);
+  }, [countdownDone]);
 
   // Exam timer — paused during grace period
   useEffect(() => {
@@ -150,34 +148,87 @@ const ExamPage = () => {
             padding: '40px 48px', maxWidth: 400,
             width: '90%', textAlign: 'center',
           }}>
-            <div style={{
-              width: 72, height: 72, borderRadius: '50%',
-              background: '#EFF6FF', border: '3px solid #3B82F6',
-              display: 'flex', alignItems: 'center',
-              justifyContent: 'center', margin: '0 auto 20px',
-              fontSize: 28, fontWeight: 700, color: '#1D4ED8',
-            }}>
-              {countdown}
-            </div>
-            <h3 style={{
-              fontSize: 18, fontWeight: 700,
-              color: '#111827', marginBottom: 8,
-            }}>
-              Setting up AI Proctoring…
-            </h3>
-            <p style={{
-              fontSize: 14, color: '#6B7280', marginBottom: 20,
-              lineHeight: 1.6,
-            }}>
-              Please look directly at the camera and stay still.
-              The exam will begin in {countdown} second{countdown !== 1 ? 's' : ''}.
-            </p>
-            <div style={{
-              background: '#F3F4F6', borderRadius: 8,
-              padding: '10px 16px', fontSize: 13, color: '#6B7280',
-            }}>
-              📷 Camera initializing &nbsp;·&nbsp; 🔊 Mic active &nbsp;·&nbsp; 🤖 AI loading
-            </div>
+            {!countdownDone ? (
+              <>
+                <div style={{
+                  width: 72, height: 72, borderRadius: '50%',
+                  background: '#EFF6FF', border: '3px solid #3B82F6',
+                  display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', margin: '0 auto 20px',
+                  fontSize: 28, fontWeight: 700, color: '#1D4ED8',
+                }}>
+                  {countdown}
+                </div>
+                <h3 style={{
+                  fontSize: 18, fontWeight: 700,
+                  color: '#111827', marginBottom: 8,
+                }}>
+                  Setting up AI Proctoring…
+                </h3>
+                <p style={{
+                  fontSize: 14, color: '#6B7280', marginBottom: 20,
+                  lineHeight: 1.6,
+                }}>
+                  Please look directly at the camera and stay still.
+                  The exam will begin in {countdown} second{countdown !== 1 ? 's' : ''}.
+                </p>
+                <div style={{
+                  background: '#F3F4F6', borderRadius: 8,
+                  padding: '10px 16px', fontSize: 13, color: '#6B7280',
+                }}>
+                  📷 Camera initializing &nbsp;·&nbsp; 🔊 Mic active &nbsp;·&nbsp; 🤖 AI loading
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{
+                  width: 72, height: 72, borderRadius: '50%',
+                  background: '#ECFDF5', border: '3px solid #10B981',
+                  display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', margin: '0 auto 20px',
+                  fontSize: 32,
+                }}>
+                  ✅
+                </div>
+                <h3 style={{
+                  fontSize: 18, fontWeight: 700,
+                  color: '#111827', marginBottom: 8,
+                }}>
+                  AI Proctoring Ready
+                </h3>
+                <p style={{
+                  fontSize: 14, color: '#6B7280', marginBottom: 24,
+                  lineHeight: 1.6,
+                }}>
+                  Everything is set up. Click below to enter fullscreen and begin your exam.
+                </p>
+                <button
+                  onClick={async () => {
+                    try {
+                      const el = document.documentElement;
+                      if (el.requestFullscreen) {
+                        await el.requestFullscreen();
+                      } else if (el.webkitRequestFullscreen) {
+                        await el.webkitRequestFullscreen();
+                      } else if (el.msRequestFullscreen) {
+                        await el.msRequestFullscreen();
+                      }
+                    } catch {
+                      // Fullscreen denied — continue anyway
+                    }
+                    setSystemReady(true);
+                  }}
+                  style={{
+                    background: 'linear-gradient(135deg, #2563EB, #1D4ED8)',
+                    color: '#fff', border: 'none', borderRadius: 12,
+                    padding: '14px 40px', fontSize: 16, fontWeight: 700,
+                    cursor: 'pointer', width: '100%',
+                  }}
+                >
+                  Begin Exam
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}

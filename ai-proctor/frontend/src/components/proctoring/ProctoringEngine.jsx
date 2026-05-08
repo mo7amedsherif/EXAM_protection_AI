@@ -99,11 +99,6 @@ const ProctoringEngine = ({ examId, onViolation }) => {
     document.addEventListener('keydown', onKey);
     window.addEventListener('blur', onBlur);
 
-    // Request fullscreen
-    document.documentElement.requestFullscreen?.().catch(() => {
-      logViolation('fullscreen_exit', 'Student denied fullscreen');
-    });
-
     return () => {
       document.removeEventListener('visibilitychange', onVisibility);
       document.removeEventListener('fullscreenchange', onFullscreen);

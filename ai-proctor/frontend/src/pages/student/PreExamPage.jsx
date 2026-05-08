@@ -45,6 +45,7 @@ const PreExamPage = () => {
   const [exam, setExam] = useState(null);
   const [alreadyCompleted, setAlreadyCompleted] = useState(false);
   const [aiStatus, setAiStatus] = useState('loading'); // 'loading' | 'ready' | 'unavailable'
+  const [mediaStatus, setMediaStatus] = useState('loading'); // 'loading' | 'done' | 'error'
   const [eligibilityStatus, setEligibilityStatus] = useState('loading');
   const [examLoadStatus, setExamLoadStatus] = useState('loading');
   const [pageReady, setPageReady] = useState(false);
@@ -52,6 +53,7 @@ const PreExamPage = () => {
 
   const wsRef = useRef(null);
   const timeoutRef = useRef(null);
+  const mediaStreamRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -112,6 +114,17 @@ const PreExamPage = () => {
         if (!cancelled) setAiStatus('unavailable');
       }
 
+      // STEP 4 — Request camera + mic permissions
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        mediaStreamRef.current = stream;
+        // Stop tracks immediately — we just needed the permission grant
+        stream.getTracks().forEach(t => t.stop());
+        if (!cancelled) setMediaStatus('done');
+      } catch {
+        if (!cancelled) setMediaStatus('error');
+      }
+
       if (!cancelled) setPageReady(true);
     };
 
@@ -121,6 +134,7 @@ const PreExamPage = () => {
       cancelled = true;
       clearTimeout(timeoutRef.current);
       wsRef.current?.close();
+      mediaStreamRef.current?.getTracks().forEach(t => t.stop());
     };
   }, [id]);
 
@@ -171,6 +185,7 @@ const PreExamPage = () => {
                 status={aiStatus === 'loading' ? 'loading' : aiStatus === 'ready' ? 'done' : 'error'}
                 label="Connecting to AI proctoring system"
               />
+              <CheckRow status={mediaStatus} label="Requesting camera & microphone access" />
             </div>
           </Card>
         </div>
