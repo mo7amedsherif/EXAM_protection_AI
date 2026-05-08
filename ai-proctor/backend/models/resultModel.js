@@ -1,5 +1,7 @@
+// ── Imports ──────────────────────────────────────────────────────────
 const mongoose = require("mongoose");
 
+// ── Schema ───────────────────────────────────────────────────────────
 const resultSchema = new mongoose.Schema(
   {
     student: {

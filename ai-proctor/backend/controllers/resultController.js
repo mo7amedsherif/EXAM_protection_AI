@@ -1,3 +1,4 @@
+// ── Imports ──────────────────────────────────────────────────────────
 const asyncHandler = require("express-async-handler");
 const Result = require("../models/resultModel");
 const Exam = require("../models/examModel");
@@ -128,6 +129,7 @@ const deleteResult = asyncHandler(async (req, res) => {
   res.json({ message: "Result deleted" });
 });
 
+// ── Exports ───────────────────────────────────────────────────────────
 module.exports = {
   submitExam,
   getMyResults,

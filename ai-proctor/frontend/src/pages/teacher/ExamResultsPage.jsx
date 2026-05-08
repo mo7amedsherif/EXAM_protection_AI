@@ -1,3 +1,4 @@
+// ── Imports ──────────────────────────────────────────────────────────
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from '../../api/axios';
@@ -14,9 +15,12 @@ import {
   TableRow,
 } from '../../components/ui/table';
 
+// ── Component ────────────────────────────────────────────────────────
 const ExamResultsPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+
+  // ── State ──────────────────────────────────────────────────────────
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -26,6 +30,7 @@ const ExamResultsPage = () => {
     fetchResults();
   }, [id]);
 
+  // ── Fetch exam results on mount ─────────────────────────────────
   const fetchResults = async () => {
     try {
       const response = await axios.get(`/results/exam/${id}`);
@@ -37,6 +42,7 @@ const ExamResultsPage = () => {
     }
   };
 
+  // ── Handler: toggle whether student can see their result ───────────
   const handleToggleVisibility = async (resultId) => {
     try {
       const res = await axios.put(`/results/${resultId}/visibility`);
@@ -48,6 +54,7 @@ const ExamResultsPage = () => {
     }
   };
 
+  // ── Handler: delete a student’s result ───────────────────────────
   const handleDeleteResult = async (resultId, studentName) => {
     if (!window.confirm(`Delete result for ${studentName}? This cannot be undone.`)) return;
     try {
@@ -58,6 +65,7 @@ const ExamResultsPage = () => {
     }
   };
 
+  // ── Handler: open violations modal for a student ────────────────
   const handleShowViolations = async (studentId, studentName) => {
     setViolationModal({ studentName, logs: [], loading: true });
     try {
@@ -68,6 +76,7 @@ const ExamResultsPage = () => {
     }
   };
 
+  // ── Helper: colour classes based on score percentage ─────────────
   const getPercentageColor = (percentage) => {
     if (percentage >= 70) {
       return "bg-gradient-to-br from-green-500 to-green-600 text-white border-green-400 shadow-md shadow-green-500/30";
@@ -78,6 +87,7 @@ const ExamResultsPage = () => {
     }
   };
 
+  // ── Helper: emoji icon per violation type ───────────────────────
   const getViolationIcon = (type) => {
     const icons = {
       tab_switch: '🔄',
@@ -96,6 +106,7 @@ const ExamResultsPage = () => {
 
   if (loading) return <div className="text-center mt-10">Loading...</div>;
 
+  // ── Derived stats ──────────────────────────────────────────────────
   const avgScore = results.length > 0 
     ? Math.round(results.reduce((acc, r) => acc + r.percentage, 0) / results.length) 
     : 0;

@@ -1,3 +1,4 @@
+// ── Imports ──────────────────────────────────────────────────────────
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from '../../api/axios';
@@ -6,7 +7,9 @@ import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 
+// ── Component ────────────────────────────────────────────────────────
 const StudentDashboard = () => {
+  // ── State ──────────────────────────────────────────────────────────
   const [exams, setExams] = useState([]);
   const [completedCount, setCompletedCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -17,6 +20,7 @@ const StudentDashboard = () => {
     fetchExams();
   }, []);
 
+  // ── Fetch exams + student's completed count on mount ──────────────
   const fetchExams = async () => {
     try {
       const [examsRes, resultsRes] = await Promise.all([
@@ -32,12 +36,14 @@ const StudentDashboard = () => {
     }
   };
 
+  // ── Navigate to pre-exam setup page ───────────────────────────────
   const handleStartExam = (examId) => {
     navigate(`/student/exam/${examId}/pre`);
   };
 
   if (loading) return <div className="text-center mt-10">Loading...</div>;
 
+  // ── Derived data ──────────────────────────────────────────────────
   const activeExams = exams.filter(e => e.isActive).length;
 
   return (
@@ -103,7 +109,7 @@ const StudentDashboard = () => {
           </Card>
         </div>
 
-        {/* Available Exams */}
+        {/* ── Exam Cards Grid ──────────────────────────────────────── */}
         <div>
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Available Exams</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -152,6 +158,7 @@ const StudentDashboard = () => {
           </div>
         </div>
 
+        {/* ── Empty State ────────────────────────────────────────── */}
         {exams.length === 0 && (
           <div className="text-center text-gray-500 mt-10">
             No available exams at the moment.

@@ -1,3 +1,4 @@
+// ── Imports ──────────────────────────────────────────────────────────
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from '../../api/axios';
@@ -5,8 +6,10 @@ import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import Navbar from '../../components/Navbar';
 
+// ── Constants ────────────────────────────────────────────────────────
 const WS_URL = 'ws://localhost:8000/ws';
 
+// ── Exam rules shown to student before starting ─────────────────────
 const EXAM_RULES = [
   'Your webcam and microphone will be active throughout the exam.',
   'Do not look away from the screen for extended periods.',
@@ -20,6 +23,7 @@ const EXAM_RULES = [
   'Ensure you are in a quiet, well-lit environment before starting.',
 ];
 
+// ── Sub-component: single check row (loading/done/error) ────────────
 const CheckRow = ({ status, label }) => (
   <div className="flex items-center gap-3 py-2">
     {status === 'loading' && (
@@ -38,10 +42,12 @@ const CheckRow = ({ status, label }) => (
   </div>
 );
 
+// ── Component ────────────────────────────────────────────────────────
 const PreExamPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
 
+  // ── State ──────────────────────────────────────────────────────────
   const [exam, setExam] = useState(null);
   const [alreadyCompleted, setAlreadyCompleted] = useState(false);
   const [aiStatus, setAiStatus] = useState('loading'); // 'loading' | 'ready' | 'unavailable'
@@ -51,10 +57,12 @@ const PreExamPage = () => {
   const [pageReady, setPageReady] = useState(false);
   const [agreed, setAgreed] = useState(false);
 
+  // ── Refs ───────────────────────────────────────────────────────────
   const wsRef = useRef(null);
   const timeoutRef = useRef(null);
   const mediaStreamRef = useRef(null);
 
+  // ── Pre-exam checks (runs on mount) ───────────────────────────────
   useEffect(() => {
     let cancelled = false;
 

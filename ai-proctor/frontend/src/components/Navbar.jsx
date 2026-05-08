@@ -1,17 +1,21 @@
+// ── Imports ──────────────────────────────────────────────────────────
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import useAuthStore from '../store/authStore';
 import { Button } from './ui/button';
 
+// ── Component ────────────────────────────────────────────────────────
 const Navbar = () => {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
 
+  // ── Logout handler ─────────────────────────────────────────────────
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
+  // ── Active route helper ────────────────────────────────────────────
   const isActive = (path) => location.pathname === path;
 
   return (
@@ -29,6 +33,7 @@ const Navbar = () => {
               <span className="font-bold text-gray-900 text-lg">AI Proctor Platform</span>
             </Link>
 
+            {/* ── Navigation Links ─────────────────────────────────── */}
             <div className="flex gap-2">
               {user?.role === 'student' && (
                 <>
@@ -78,6 +83,7 @@ const Navbar = () => {
             </div>
           </div>
 
+          {/* ── User Info & Logout ─────────────────────────────────── */}
           <div className="flex items-center gap-6">
             <div className="text-right">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 capitalize">{user?.role}</p>

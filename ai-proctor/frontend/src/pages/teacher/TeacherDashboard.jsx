@@ -1,3 +1,4 @@
+// ── Imports ──────────────────────────────────────────────────────────
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from '../../api/axios';
@@ -6,7 +7,9 @@ import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 
+// ── Component ────────────────────────────────────────────────────────
 const TeacherDashboard = () => {
+  // ── State ──────────────────────────────────────────────────────────
   const [exams, setExams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -16,6 +19,7 @@ const TeacherDashboard = () => {
     fetchExams();
   }, []);
 
+  // ── Fetch teacher’s exams on mount ───────────────────────────────
   const fetchExams = async () => {
     try {
       const response = await axios.get('/exams');
@@ -27,6 +31,7 @@ const TeacherDashboard = () => {
     }
   };
 
+  // ── Handler: delete an exam ─────────────────────────────────────
   const handleDelete = async (examId) => {
     if (!window.confirm('Are you sure you want to delete this exam?')) return;
 
@@ -38,6 +43,7 @@ const TeacherDashboard = () => {
     }
   };
 
+  // ── Handler: toggle exam active/inactive ─────────────────────────
   const handleToggleActive = async (examId, currentStatus) => {
     try {
       await axios.put(`/exams/${examId}`, { isActive: !currentStatus });
@@ -53,6 +59,7 @@ const TeacherDashboard = () => {
 
   if (loading) return <div className="text-center mt-10">Loading...</div>;
 
+  // ── Derived data ──────────────────────────────────────────────────
   const activeExams = exams.filter(e => e.isActive).length;
   const totalStudents = exams.reduce((acc, exam) => acc + (exam.totalStudents || 0), 0);
 
@@ -231,6 +238,7 @@ const TeacherDashboard = () => {
           </div>
         </div>
 
+        {/* ── Empty State ────────────────────────────────────────── */}
         {exams.length === 0 && (
           <div className="text-center text-gray-500 mt-10">
             No exams found. Create your first exam!
