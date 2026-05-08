@@ -20,26 +20,13 @@ const ExamPage = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [showCamera, setShowCamera] = useState(true);
-  const [criticalViolations, setCriticalViolations] = useState(0);
-
-  const handleViolation = useCallback((type) => {
-    const criticalTypes = ['cell_phone_detected', 'multiple_faces', 'tab_switch', 'browser_dev_tools', 'speech_detected', 'fullscreen_exit'];
-    if (criticalTypes.includes(type)) {
-      setCriticalViolations((prev) => prev + 1);
-    }
-  }, []);
+  const [warningModal, setWarningModal] = useState(null);
 
   // Keep a ref to the latest handleSubmit so effects never call a stale closure
   const submitRef = useRef(null);
   useEffect(() => {
     submitRef.current = handleSubmit;
   });
-
-  useEffect(() => {
-    if (criticalViolations >= 3 && !submitting) {
-      submitRef.current?.(true);
-    }
-  }, [criticalViolations, submitting]);
 
   useEffect(() => {
     fetchExamData();
@@ -80,7 +67,7 @@ const ExamPage = () => {
     setAnswers({ ...answers, [questionId]: optionIndex });
   };
 
-  const handleSubmit = async (isTerminated = false) => {
+  const handleSubmit = useCallback(async (terminated = false) => {
     if (submitting) return;
     setSubmitting(true);
 
@@ -93,19 +80,26 @@ const ExamPage = () => {
       const response = await axios.post('/results', {
         examId: id,
         answers: answersArray,
-        terminated: isTerminated === true,
+        terminated,
       });
-      navigate('/student/result', { 
-        state: { 
+      navigate('/student/result', {
+        state: {
           result: response.data,
-          terminated: isTerminated === true
-        } 
+          terminated,
+        },
       });
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to submit exam');
       setSubmitting(false);
     }
-  };
+  }, [submitting, questions, answers, id, navigate]);
+
+  const handleViolation = useCallback(({ type, description, count, level }) => {
+    setWarningModal({ level, type, description, count });
+    if (level === 'terminate') {
+      handleSubmit(true);
+    }
+  }, [handleSubmit]);
 
   const formatTime = (seconds) => {
     const hours = Math.floor(seconds / 3600);
@@ -238,7 +232,7 @@ const ExamPage = () => {
             <div className="flex gap-4">
               {currentQuestion === questions.length - 1 ? (
                 <Button 
-                  onClick={handleSubmit}
+                  onClick={() => handleSubmit()}
                   disabled={submitting}
                   className="px-10 py-6 rounded-xl font-semibold bg-gradient-to-br from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 shadow-lg shadow-green-600/30 hover:scale-105 hover:shadow-xl transition-all duration-200"
                 >
@@ -278,6 +272,110 @@ const ExamPage = () => {
           </div>
         </Card>
       </div>
+
+      {/* WARNING 1 — yellow */}
+      {warningModal?.level === 'warning' && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 10000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(0,0,0,0.55)',
+        }}>
+          <div style={{
+            background: '#FEF3C7', border: '2px solid #F59E0B',
+            borderRadius: 16, padding: 32, maxWidth: 460, width: '90%',
+            textAlign: 'center',
+          }}>
+            <div style={{ fontSize: 52, marginBottom: 12 }}>⚠️</div>
+            <h2 style={{ color: '#92400E', fontSize: 22, fontWeight: 700, marginBottom: 8 }}>
+              Warning {warningModal.count} of 3
+            </h2>
+            <p style={{ color: '#78350F', fontSize: 15, marginBottom: 8 }}>
+              <strong>Detected:</strong> {warningModal.description}
+            </p>
+            <p style={{ color: '#78350F', fontSize: 14, marginBottom: 24 }}>
+              You have <strong>{3 - warningModal.count} warning(s) remaining</strong> before
+              your exam is automatically terminated.
+            </p>
+            <button
+              onClick={() => setWarningModal(null)}
+              style={{
+                background: '#F59E0B', color: '#fff', border: 'none',
+                borderRadius: 8, padding: '10px 28px',
+                fontSize: 15, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              I Understand — Continue Exam
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* WARNING 2 — orange/red */}
+      {warningModal?.level === 'final' && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 10000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(0,0,0,0.65)',
+        }}>
+          <div style={{
+            background: '#FEE2E2', border: '2px solid #EF4444',
+            borderRadius: 16, padding: 32, maxWidth: 460, width: '90%',
+            textAlign: 'center',
+          }}>
+            <div style={{ fontSize: 52, marginBottom: 12 }}>🚨</div>
+            <h2 style={{ color: '#7F1D1D', fontSize: 22, fontWeight: 700, marginBottom: 8 }}>
+              Final Warning — 2 of 3
+            </h2>
+            <p style={{ color: '#991B1B', fontSize: 15, marginBottom: 8 }}>
+              <strong>Detected:</strong> {warningModal.description}
+            </p>
+            <p style={{ color: '#991B1B', fontSize: 14, marginBottom: 24 }}>
+              ⛔ <strong>One more violation will immediately terminate your exam.</strong><br/>
+              Your answers will be submitted as-is.
+            </p>
+            <button
+              onClick={() => setWarningModal(null)}
+              style={{
+                background: '#EF4444', color: '#fff', border: 'none',
+                borderRadius: 8, padding: '10px 28px',
+                fontSize: 15, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              I Understand — This Is My Last Warning
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* WARNING 3 — terminated, cannot be dismissed */}
+      {warningModal?.level === 'terminate' && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 10000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(127,29,29,0.96)',
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: 16,
+            padding: 40, maxWidth: 460, width: '90%',
+            textAlign: 'center',
+          }}>
+            <div style={{ fontSize: 56, marginBottom: 12 }}>🛑</div>
+            <h2 style={{ color: '#7F1D1D', fontSize: 24, fontWeight: 700, marginBottom: 8 }}>
+              Exam Terminated
+            </h2>
+            <p style={{ color: '#991B1B', fontSize: 15, marginBottom: 8 }}>
+              <strong>Reason:</strong> {warningModal.description}
+            </p>
+            <p style={{ color: '#6B7280', fontSize: 14, marginBottom: 20 }}>
+              You received 3 violations. Your exam has been submitted
+              and your teacher has been notified.
+            </p>
+            <p style={{ color: '#9CA3AF', fontSize: 13 }}>
+              Redirecting to dashboard…
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -14,6 +14,7 @@ const ProctoringEngine = ({ examId, onViolation }) => {
   const processorRef     = useRef(null);
   const streamRef        = useRef(null);
   const violationRef     = useRef({});
+  const violationCountRef = useRef(0);
   const previewImgRef    = useRef(null);
 
   // ── Debounced violation logger ─────────────────────────────
@@ -23,16 +24,24 @@ const ProctoringEngine = ({ examId, onViolation }) => {
         now - violationRef.current[type] < DEBOUNCE_MS) return;
     violationRef.current[type] = now;
 
+    violationCountRef.current += 1;
+    const count = violationCountRef.current;
+
+    if (onViolation) {
+      onViolation({
+        type,
+        description,
+        count,
+        level: count === 1 ? 'warning' : count === 2 ? 'final' : 'terminate',
+      });
+    }
+
     axios.post('/cheating-logs', {
       examId,
       type,
       confidence,
       description,
     }).catch(err => console.error('Log error:', err.message));
-
-    if (onViolation) {
-      onViolation(type);
-    }
   }, [examId, onViolation]);
 
   // ── Browser event violations ───────────────────────────────

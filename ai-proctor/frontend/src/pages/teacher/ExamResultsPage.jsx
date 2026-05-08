@@ -109,6 +109,7 @@ const ExamResultsPage = () => {
                 <TableHead className="py-5 font-bold text-gray-900">Score</TableHead>
                 <TableHead className="py-5 font-bold text-gray-900">Total Marks</TableHead>
                 <TableHead className="py-5 font-bold text-gray-900">Percentage</TableHead>
+                <TableHead className="py-5 font-bold text-gray-900">Status</TableHead>
                 <TableHead className="py-5 font-bold text-gray-900">Submitted At</TableHead>
               </TableRow>
             </TableHeader>
@@ -123,6 +124,25 @@ const ExamResultsPage = () => {
                     <Badge className={`border-2 px-4 py-1.5 rounded-xl font-bold uppercase tracking-wide ${getPercentageColor(result.percentage)}`}>
                       {result.percentage}%
                     </Badge>
+                  </TableCell>
+                  <TableCell className="py-5">
+                    {result.terminated ? (
+                      <span style={{
+                        background: '#FEE2E2', color: '#7F1D1D',
+                        padding: '2px 10px', borderRadius: 20,
+                        fontSize: 12, fontWeight: 600,
+                      }}>
+                        🛑 Terminated
+                      </span>
+                    ) : (
+                      <span style={{
+                        background: '#D1FAE5', color: '#065F46',
+                        padding: '2px 10px', borderRadius: 20,
+                        fontSize: 12, fontWeight: 600,
+                      }}>
+                        ✓ Completed
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell className="py-5 text-sm text-gray-600 font-mono">
                     {new Date(result.submittedAt).toLocaleString()}

@@ -8,6 +8,7 @@ const ResultPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const result = location.state?.result;
+  const terminated = location.state?.terminated || false;
 
   if (!result) {
     return (
@@ -70,6 +71,18 @@ const ResultPage = () => {
 
       <div className="max-w-3xl mx-auto py-16 px-8">
         <Card className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-200/50 p-12 hover:shadow-3xl transition-all duration-300">
+          {terminated && (
+            <div style={{
+              background: '#FEE2E2', border: '1px solid #EF4444',
+              borderRadius: 8, padding: '10px 16px',
+              marginBottom: 20, textAlign: 'center',
+            }}>
+              <p style={{ color: '#7F1D1D', fontWeight: 600, margin: 0, fontSize: 14 }}>
+                🛑 This exam was terminated due to repeated violations.
+                Your teacher has been notified.
+              </p>
+            </div>
+          )}
           {/* Score Display */}
           <div className="text-center mb-12">
             <div className="relative inline-block">

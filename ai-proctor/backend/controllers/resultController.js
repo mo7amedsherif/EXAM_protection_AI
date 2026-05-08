@@ -50,6 +50,7 @@ const submitExam = asyncHandler(async (req, res) => {
     score,
     totalMarks,
     percentage,
+    terminated: result.terminated,
     submittedAt: result.submittedAt,
   });
 });
