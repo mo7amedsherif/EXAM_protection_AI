@@ -41,7 +41,6 @@ const MyResultsPage = () => {
       <div className="bg-white/80 backdrop-blur-md border-b border-gray-200/50">
         <div className="max-w-7xl mx-auto px-8 py-8">
           <h1 className="text-3xl font-bold text-gray-900">My Results</h1>
-          <p className="text-gray-600 mt-2 text-lg">View your exam scores and performance</p>
         </div>
       </div>
 

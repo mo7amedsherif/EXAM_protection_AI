@@ -8,6 +8,7 @@ import { Badge } from '../../components/ui/badge';
 
 const StudentDashboard = () => {
   const [exams, setExams] = useState([]);
+  const [completedCount, setCompletedCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -18,8 +19,12 @@ const StudentDashboard = () => {
 
   const fetchExams = async () => {
     try {
-      const response = await axios.get('/exams');
-      setExams(response.data);
+      const [examsRes, resultsRes] = await Promise.all([
+        axios.get('/exams'),
+        axios.get('/results/my'),
+      ]);
+      setExams(examsRes.data);
+      setCompletedCount(resultsRes.data.length);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to fetch exams');
     } finally {
@@ -44,7 +49,6 @@ const StudentDashboard = () => {
         <div className="max-w-7xl mx-auto px-8 py-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Student Dashboard</h1>
-            <p className="text-gray-600 mt-2 text-lg">View and take available exams</p>
           </div>
         </div>
       </div>
@@ -88,7 +92,7 @@ const StudentDashboard = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 uppercase tracking-wide mb-2">Completed</p>
-                <p className="text-4xl font-bold text-gray-900">--</p>
+                <p className="text-4xl font-bold text-gray-900">{completedCount}</p>
               </div>
               <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-500/30 group-hover:scale-110 transition-transform duration-300">
                 <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
