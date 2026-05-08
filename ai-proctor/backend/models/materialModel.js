@@ -31,8 +31,13 @@ const materialSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    // Disk path relative to backend root e.g. "uploads/materials/xxx.pdf"
-    filePath: {
+    // Object key inside the R2 bucket e.g. "materials/1234567890-file.pdf"
+    r2Key: {
+      type: String,
+      required: true,
+    },
+    // Full public URL e.g. "https://pub-xxx.r2.dev/materials/1234567890-file.pdf"
+    fileUrl: {
       type: String,
       required: true,
     },

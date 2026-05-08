@@ -56,13 +56,15 @@ const StudentMaterialsPage = () => {
   const handleDownload = async (material) => {
     setDownloading(material._id);
     try {
-      const response = await axios.get(`/materials/${material._id}/download`, {
-        responseType: 'blob',
-      });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      // Backend increments count and returns the R2 public URL
+      const { data } = await axios.get(`/materials/${material._id}/download`);
+      // Fetch file from R2 CDN as a blob and trigger browser download
+      const response = await fetch(data.fileUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', material.fileName);
+      link.setAttribute('download', data.fileName);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -71,6 +73,16 @@ const StudentMaterialsPage = () => {
       alert('Download failed. Please try again.');
     } finally {
       setDownloading(null);
+    }
+  };
+
+  // ── Open handler (view in new tab via R2 CDN) ──────────────────────
+  const handleOpen = async (material) => {
+    try {
+      const { data } = await axios.get(`/materials/${material._id}/view-token`);
+      window.open(data.fileUrl, '_blank', 'noopener,noreferrer');
+    } catch {
+      alert('Could not open file. Please try again.');
     }
   };
 
@@ -143,15 +155,11 @@ const StudentMaterialsPage = () => {
                     {material.fileType.toUpperCase()} · {formatSize(material.fileSize)} · ↓ {material.downloadCount}
                   </span>
                   <div className="flex gap-2">
-                    {/* Open in new tab — PDFs render in browser viewer,
-                        Word/PPT will trigger a download (expected behavior) */}
+                    {/* Open in new tab via R2 CDN */}
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => {
-                        const filename = material.filePath.split(/[/\\]/).pop();
-                        window.open(`http://localhost:5000/uploads/materials/${filename}`, '_blank', 'noopener,noreferrer');
-                      }}
+                      onClick={() => handleOpen(material)}
                       className="text-blue-600 border-blue-300 hover:bg-blue-50"
                     >
                       Open

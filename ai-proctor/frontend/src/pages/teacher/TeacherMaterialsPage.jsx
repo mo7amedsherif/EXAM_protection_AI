@@ -24,8 +24,9 @@ const TeacherMaterialsPage = () => {
   // ── State ──────────────────────────────────────────────────────────
   const [materials, setMaterials] = useState([]);
   const [loading, setLoading]     = useState(true);
-  const [uploading, setUploading] = useState(false);
-  const [error, setError]         = useState('');
+  const [uploading, setUploading]         = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [error, setError]                   = useState('');
   const [success, setSuccess]     = useState('');
 
   // Upload form
@@ -82,6 +83,12 @@ const TeacherMaterialsPage = () => {
       fd.append('file', selectedFile);
       const res = await axios.post('/materials', fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (progressEvent) => {
+          const percent = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total
+          );
+          setUploadProgress(percent);
+        },
       });
       setMaterials([res.data, ...materials]);
       setForm({ title: '', description: '', subject: '' });
@@ -92,6 +99,7 @@ const TeacherMaterialsPage = () => {
       setError(err.response?.data?.message || 'Upload failed');
     } finally {
       setUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -225,6 +233,27 @@ const TeacherMaterialsPage = () => {
           >
             {uploading ? 'Uploading…' : 'Upload Material'}
           </Button>
+
+          {/* ── Upload Progress Bar ──────────────────────────────── */}
+          {uploading && (
+            <div className="mt-3">
+              <div className="flex justify-between text-xs text-gray-500 mb-1">
+                <span>Uploading to cloud…</span>
+                <span>{uploadProgress}%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+              {uploadProgress === 100 && (
+                <p className="text-xs text-blue-600 mt-1">
+                  Processing… please wait
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* ── Materials List ───────────────────────────────────────── */}

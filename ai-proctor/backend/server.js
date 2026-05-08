@@ -18,8 +18,6 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Serve uploaded files as static assets
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 //for checking if the server is running or not
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", env: process.env.NODE_ENV });
