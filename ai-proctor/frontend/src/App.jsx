@@ -11,6 +11,7 @@ import StudentDashboard from './pages/student/StudentDashboard';
 import ExamPage from './pages/student/ExamPage';
 import PreExamPage from './pages/student/PreExamPage';
 import ResultPage from './pages/student/ResultPage';
+import MyResultsPage from './pages/student/MyResultsPage';
 import useAuthStore from './store/authStore';
 
 function App() {
@@ -125,6 +126,18 @@ function App() {
             <ProtectedRoute>
               {user?.role === 'student' ? (
                 <ResultPage />
+              ) : (
+                <Navigate to="/teacher/dashboard" />
+              )}
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/student/my-results"
+          element={
+            <ProtectedRoute>
+              {user?.role === 'student' ? (
+                <MyResultsPage />
               ) : (
                 <Navigate to="/teacher/dashboard" />
               )}

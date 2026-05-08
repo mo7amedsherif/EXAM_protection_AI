@@ -153,7 +153,7 @@ const PreExamPage = () => {
               Each exam can only be taken once. Your result has been saved.
             </p>
             <Button
-              onClick={() => navigate('/student/dashboard')}
+              onClick={() => navigate('/student/my-results')}
               className="w-full bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 py-5 rounded-xl font-semibold text-lg shadow-lg shadow-blue-600/30 hover:scale-105 hover:shadow-xl transition-all duration-200"
             >
               View My Results

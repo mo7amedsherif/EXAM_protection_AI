@@ -28,6 +28,7 @@ const resultSchema = new mongoose.Schema(
     totalMarks: { type: Number, default: 0 },
     percentage: { type: Number, default: 0 },
     terminated: { type: Boolean, default: false },
+    visibleToStudent: { type: Boolean, default: true },
     submittedAt:{ type: Date,   default: Date.now },
   },
   { timestamps: true }

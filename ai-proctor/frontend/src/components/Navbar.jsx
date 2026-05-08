@@ -31,15 +31,26 @@ const Navbar = () => {
 
             <div className="flex gap-2">
               {user?.role === 'student' && (
-                <Link to="/student/dashboard">
-                  <button className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
-                    isActive('/student/dashboard') || isActive('/student/exam')
-                      ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-600/30'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                  }`}>
-                    My Exams
-                  </button>
-                </Link>
+                <>
+                  <Link to="/student/dashboard">
+                    <button className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
+                      isActive('/student/dashboard')
+                        ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-600/30'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                    }`}>
+                      My Exams
+                    </button>
+                  </Link>
+                  <Link to="/student/my-results">
+                    <button className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
+                      isActive('/student/my-results')
+                        ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-600/30'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                    }`}>
+                      My Results
+                    </button>
+                  </Link>
+                </>
               )}
 
               {user?.role === 'teacher' && (

@@ -55,11 +55,14 @@ const submitExam = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc   Get current student's results
+// @desc   Get current student's results (only visible ones)
 // @route  GET /api/results/my
 // @access Student only
 const getMyResults = asyncHandler(async (req, res) => {
-  const results = await Result.find({ student: req.user._id })
+  const results = await Result.find({
+    student: req.user._id,
+    visibleToStudent: { $ne: false },
+  })
     .populate("exam", "title duration")
     .sort("-submittedAt");
   res.json(results);
@@ -86,4 +89,49 @@ const getExamResults = asyncHandler(async (req, res) => {
   res.json(results);
 });
 
-module.exports = { submitExam, getMyResults, getExamResults };
+// @desc   Toggle result visibility for student
+// @route  PUT /api/results/:id/visibility
+// @access Teacher only
+const toggleResultVisibility = asyncHandler(async (req, res) => {
+  const result = await Result.findById(req.params.id).populate("exam");
+  if (!result) {
+    res.status(404);
+    throw new Error("Result not found");
+  }
+
+  if (result.exam.teacher.toString() !== req.user._id.toString()) {
+    res.status(403);
+    throw new Error("Not authorized");
+  }
+
+  result.visibleToStudent = !result.visibleToStudent;
+  await result.save();
+  res.json({ _id: result._id, visibleToStudent: result.visibleToStudent });
+});
+
+// @desc   Delete a result
+// @route  DELETE /api/results/:id
+// @access Teacher only
+const deleteResult = asyncHandler(async (req, res) => {
+  const result = await Result.findById(req.params.id).populate("exam");
+  if (!result) {
+    res.status(404);
+    throw new Error("Result not found");
+  }
+
+  if (result.exam.teacher.toString() !== req.user._id.toString()) {
+    res.status(403);
+    throw new Error("Not authorized");
+  }
+
+  await Result.findByIdAndDelete(req.params.id);
+  res.json({ message: "Result deleted" });
+});
+
+module.exports = {
+  submitExam,
+  getMyResults,
+  getExamResults,
+  toggleResultVisibility,
+  deleteResult,
+};

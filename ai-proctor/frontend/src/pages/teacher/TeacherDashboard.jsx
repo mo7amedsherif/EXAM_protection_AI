@@ -202,29 +202,26 @@ const TeacherDashboard = () => {
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    onClick={() => navigate(`/teacher/exam/${exam._id}/cheating`)}
-                    className="flex-1 rounded-xl py-3 hover:bg-orange-50 hover:border-orange-300 hover:scale-105 transition-all duration-200"
-                  >
-                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                    Logs
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
                     onClick={() => handleToggleActive(exam._id, exam.isActive)}
-                    className="flex-1 rounded-xl py-3 hover:bg-yellow-50 hover:border-yellow-300 hover:scale-105 transition-all duration-200"
+                    title={exam.isActive ? 'Disable exam' : 'Enable exam'}
+                    className={`rounded-xl py-3 px-3 hover:scale-105 transition-all duration-200 ${
+                      exam.isActive
+                        ? 'text-green-600 hover:bg-red-50 hover:border-red-300 hover:text-red-600'
+                        : 'text-gray-400 hover:bg-green-50 hover:border-green-300 hover:text-green-600'
+                    }`}
                   >
-                    {exam.isActive ? 'Disable' : 'Enable'}
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
                   </Button>
                   <Button 
                     variant="outline" 
                     size="sm" 
                     onClick={() => handleDelete(exam._id)}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50 hover:border-red-300 rounded-xl py-3 hover:scale-105 transition-all duration-200"
+                    title="Delete exam"
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50 hover:border-red-300 rounded-xl py-3 px-3 hover:scale-105 transition-all duration-200"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
                   </Button>
