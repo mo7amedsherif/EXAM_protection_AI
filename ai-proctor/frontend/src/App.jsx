@@ -13,6 +13,7 @@ import CreateExamPage from './pages/teacher/CreateExamPage';
 import ExamDetailPage from './pages/teacher/ExamDetailPage';
 import ExamResultsPage from './pages/teacher/ExamResultsPage';
 import CheatLogPage from './pages/teacher/CheatLogPage';
+import TeacherMaterialsPage from './pages/teacher/TeacherMaterialsPage';
 
 // ── Page Imports: Student ───────────────────────────────────────────
 import StudentDashboard from './pages/student/StudentDashboard';
@@ -20,6 +21,7 @@ import ExamPage from './pages/student/ExamPage';
 import PreExamPage from './pages/student/PreExamPage';
 import ResultPage from './pages/student/ResultPage';
 import MyResultsPage from './pages/student/MyResultsPage';
+import StudentMaterialsPage from './pages/student/StudentMaterialsPage';
 
 function App() {
   const user = useAuthStore((state) => state.user);
@@ -92,6 +94,18 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/teacher/materials"
+          element={
+            <ProtectedRoute>
+              {user?.role === 'teacher' ? (
+                <TeacherMaterialsPage />
+              ) : (
+                <Navigate to="/student/dashboard" />
+              )}
+            </ProtectedRoute>
+          }
+        />
         {/* ── Student Routes (protected) ────────────────────────── */}
         <Route
           path="/student/dashboard"
@@ -147,6 +161,18 @@ function App() {
             <ProtectedRoute>
               {user?.role === 'student' ? (
                 <MyResultsPage />
+              ) : (
+                <Navigate to="/teacher/dashboard" />
+              )}
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/student/materials"
+          element={
+            <ProtectedRoute>
+              {user?.role === 'student' ? (
+                <StudentMaterialsPage />
               ) : (
                 <Navigate to="/teacher/dashboard" />
               )}

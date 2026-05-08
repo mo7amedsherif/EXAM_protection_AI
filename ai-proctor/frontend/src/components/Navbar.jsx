@@ -55,6 +55,15 @@ const Navbar = () => {
                       My Results
                     </button>
                   </Link>
+                  <Link to="/student/materials">
+                    <button className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
+                      isActive('/student/materials')
+                        ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-600/30'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                    }`}>
+                      Materials
+                    </button>
+                  </Link>
                 </>
               )}
 
@@ -76,6 +85,15 @@ const Navbar = () => {
                         : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                     }`}>
                       Create Exam
+                    </button>
+                  </Link>
+                  <Link to="/teacher/materials">
+                    <button className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
+                      isActive('/teacher/materials')
+                        ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-600/30'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                    }`}>
+                      Materials
                     </button>
                   </Link>
                 </>
