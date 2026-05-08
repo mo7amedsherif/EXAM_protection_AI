@@ -216,7 +216,15 @@ const TeacherMaterialsPage = () => {
               type="file"
               ref={fileInputRef}
               accept=".pdf,.doc,.docx,.ppt,.pptx"
-              onChange={e => setSelectedFile(e.target.files[0] || null)}
+              onChange={e => {
+                const file = e.target.files[0] || null;
+                setSelectedFile(file);
+                if (file && !form.title.trim()) {
+                  // Auto-fill title from filename (strip extension)
+                  const nameWithoutExt = file.name.replace(/\.[^/.]+$/, '');
+                  setForm(prev => ({ ...prev, title: nameWithoutExt }));
+                }
+              }}
               className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
             />
             {selectedFile && (
