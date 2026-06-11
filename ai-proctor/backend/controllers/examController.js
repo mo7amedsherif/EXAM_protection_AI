@@ -33,7 +33,8 @@ const getExams = asyncHandler(async (req, res) => {
   if (req.user.role === "teacher") {
     exams = await Exam.find({ teacher: req.user._id }).sort("-createdAt");
   } else {
-    exams = await Exam.find({ isActive: true })
+    // Students only see exams that are both active AND published
+    exams = await Exam.find({ isActive: true, isPublished: true })
       .populate("teacher", "name email")
       .sort("-createdAt");
   }
@@ -53,6 +54,12 @@ const getExamById = asyncHandler(async (req, res) => {
   if (!exam) {
     res.status(404);
     throw new Error("Exam not found");
+  }
+
+  // Students cannot access unpublished exams
+  if (req.user.role === "student" && !exam.isPublished) {
+    res.status(403);
+    throw new Error("This exam is not available yet");
   }
 
   res.json(exam);

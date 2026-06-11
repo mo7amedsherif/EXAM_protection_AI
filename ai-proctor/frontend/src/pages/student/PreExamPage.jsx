@@ -70,7 +70,7 @@ const PreExamPage = () => {
       try {
         const res = await axios.get('/results/my');
         const taken = res.data.some(
-          (r) => r.exam === id || r.exam?._id === id
+          (r) => r.exam?._id?.toString() === id.toString()
         );
         if (!cancelled) {
           setAlreadyCompleted(taken);

@@ -134,9 +134,10 @@ const ExamPage = () => {
   const handleViolation = useCallback(({ type, description, count, level }) => {
     setWarningModal({ level, type, description, count });
     if (level === 'terminate') {
-      handleSubmit(true);
+      // Use submitRef so we always call the latest handleSubmit (avoids stale closure)
+      submitRef.current(true);
     }
-  }, [handleSubmit]);
+  }, []); // no deps needed — submitRef is always current
 
   const formatTime = (seconds) => {
     const hours = Math.floor(seconds / 3600);
@@ -146,7 +147,21 @@ const ExamPage = () => {
   };
 
   if (loading) return <div className="text-center mt-10">Loading...</div>;
-  if (!questions || questions.length === 0) return <Spinner />;
+  if (!questions || questions.length === 0) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-center">
+        <div className="text-5xl mb-4">📋</div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">No Questions Yet</h2>
+        <p className="text-gray-600 mb-6">This exam has no questions added yet. Please check back later.</p>
+        <button
+          onClick={() => navigate('/student/dashboard')}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all"
+        >
+          Back to Dashboard
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-gray-50">

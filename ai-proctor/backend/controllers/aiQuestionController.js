@@ -186,9 +186,9 @@ ${truncated}`;
   // Add Gemini models as fallback
   if (process.env.GEMINI_API_KEY) {
     providers.push(
-      { type: 'gemini', model: 'gemini-3.1-flash-lite' },
-      { type: 'gemini', model: 'gemini-2.5-flash-lite' },
-      { type: 'gemini', model: 'gemini-3.5-flash' }
+      { type: 'gemini', model: 'gemini-2.0-flash' },
+      { type: 'gemini', model: 'gemini-1.5-flash' },
+      { type: 'gemini', model: 'gemini-1.5-pro' }
     );
   }
 

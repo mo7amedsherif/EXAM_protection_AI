@@ -73,11 +73,17 @@ async def websocket_endpoint(websocket: WebSocket):
                     if not proctor_opts.get("voiceDetection", True):
                         continue
                     audio_buffer.extend(message["bytes"])
-                    CHUNK_SIZE = 1200
                     print(f"Received audio bytes. Buffer size: {len(audio_buffer)}")
-                    while len(audio_buffer) >= CHUNK_SIZE:
-                        chunk = bytes(audio_buffer[:CHUNK_SIZE])
-                        audio_buffer = audio_buffer[CHUNK_SIZE:]
+                    # process_audio_chunk handles its own 960-byte (30ms @ 16kHz) frame
+                    # slicing internally. Pass the whole buffer at once and let it drain.
+                    # 960 bytes = 30ms frame = the minimum alignment webrtcvad requires.
+                    DRAIN_SIZE = 960  # must be multiple of 960
+                    while len(audio_buffer) >= DRAIN_SIZE:
+                        # Grab as many complete 960-byte frames as possible
+                        frames_available = len(audio_buffer) // 960
+                        take = frames_available * 960
+                        chunk = bytes(audio_buffer[:take])
+                        audio_buffer = audio_buffer[take:]
                         is_speaking = speech_detector.process_audio_chunk(chunk)
                         speech_logic.update(is_speaking)
                     if speech_logic.cheating:

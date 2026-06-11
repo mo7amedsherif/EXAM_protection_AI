@@ -3,8 +3,6 @@ import time
 from modules.face_detection import FaceDetector
 from modules.head_pose import HeadPoseEstimator
 from modules.head_pose_logic import HeadPoseLogic
-from modules.eye_tracking import EyeTracker
-from modules.eye_tracking_logic import EyeTrackingLogic
 from modules.speech_detection import SpeechDetector
 from modules.speech_logic import SpeechLogic
 from modules.object_detection import ObjectDetector
@@ -20,8 +18,6 @@ def main():
     face_detector = FaceDetector(settings.FACE_CONFIDENCE)
     pose_estimator = HeadPoseEstimator()
     pose_logic = HeadPoseLogic()
-    eye_tracker = EyeTracker()
-    eye_logic = EyeTrackingLogic()
     speech_detector = SpeechDetector()
     speech_logic = SpeechLogic()
     object_detector = ObjectDetector()
@@ -46,12 +42,6 @@ def main():
         # =========================
         direction, angle = pose_estimator.get_pose(frame)
         cheating = pose_logic.update(direction)
-
-        # =========================
-        # EYE TRACKING
-        # =========================
-        eye_dir = eye_tracker.get_eye_direction(frame)
-        eye_cheating = eye_logic.update(eye_dir)
 
         # =========================
         # SPEECH DETECTION
@@ -121,10 +111,6 @@ def main():
             warning = "Cheating: Looking Away"
             color = (0, 0, 255)
 
-        elif eye_cheating:
-            warning = "Cheating: Eye Tracking"
-            color = (0, 0, 255)
-
         elif speech_cheating:
             warning = "Speech Detection"
             color = (0, 0, 255)
@@ -144,18 +130,14 @@ def main():
         cv2.putText(frame, f"Head Dir: {direction}", (20, 85),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
-        cv2.putText(frame, f"Eye Dir: {eye_dir}", (300, 85),
+        cv2.putText(frame, f"Faces: {len(faces)}", (300, 85),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-
-        cv2.putText(frame, f"Faces: {len(faces)}", (500, 85),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
         # الصوت
         speech_text = "Yes" if is_speaking else "No"
-        cv2.putText(frame, f"Voice: {speech_text}", (500, 125),
+        cv2.putText(frame, f"Voice: {speech_text}", (300, 125),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0) if not is_speaking else (0, 0, 255), 2)
 
-        # الوقت للرأس
         if pose_logic.look_start_time:
             elapsed = time.time() - pose_logic.look_start_time
         else:
@@ -164,14 +146,14 @@ def main():
         cv2.putText(frame, f"Head Time: {round(elapsed,1)}s", (20, 125),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
 
-        # الوقت للعين
-        if eye_logic.look_start_time:
-            eye_elapsed = time.time() - eye_logic.look_start_time
-        else:
-            eye_elapsed = 0
+        # # الوقت للعين
+        # if eye_logic.look_start_time:
+        #     eye_elapsed = time.time() - eye_logic.look_start_time
+        # else:
+        #     eye_elapsed = 0
 
-        cv2.putText(frame, f"Eye Time: {round(eye_elapsed,1)}s", (300, 125),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+        # cv2.putText(frame, f"Eye Time: {round(eye_elapsed,1)}s", (300, 125),
+        #             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
 
         # =========================
         # SCREENSHOT SYSTEM

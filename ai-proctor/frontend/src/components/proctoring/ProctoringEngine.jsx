@@ -71,6 +71,8 @@ const ProctoringEngine = ({ examId, onViolation, isSubmittingRef, proctoringOpti
   const violationCountRef = useRef(0);
   const previewImgRef    = useRef(null);
   const examStartTime    = useRef(Date.now());
+  // Always holds the latest proctoringOptions without causing WS reconnect
+  const proctoringOptionsRef = useRef(proctoringOptions);
 
   // ── Head pose warning state ───────────────────────────────
   const [headWarning, setHeadWarning] = useState(null);
@@ -100,14 +102,15 @@ const ProctoringEngine = ({ examId, onViolation, isSubmittingRef, proctoringOpti
           level: count === 1 ? 'warning' : count === 2 ? 'final' : 'terminate',
         });
       }
-    }
 
-    axios.post('/cheating-logs', {
-      examId,
-      type,
-      confidence,
-      description,
-    }).catch(err => console.error('Log error:', err.message));
+      // Only persist to DB once the grace period has passed
+      axios.post('/cheating-logs', {
+        examId,
+        type,
+        confidence,
+        description,
+      }).catch(err => console.error('Log error:', err.message));
+    }
   }, [examId, onViolation]);
 
   // ── Browser event violations ───────────────────────────────
@@ -183,8 +186,13 @@ const ProctoringEngine = ({ examId, onViolation, isSubmittingRef, proctoringOpti
 
     ws.onopen = () => {
       console.log('Python AI proctoring connected');
-      // Send examId first
-      ws.send(JSON.stringify({ examId, proctoringOptions }));
+      // Send examId and whatever proctoringOptions we have right now.
+      // If exam data hasn't loaded yet, proctoringOptionsRef.current may be
+      // undefined — a second send is dispatched by the effect below once it loads.
+      ws.send(JSON.stringify({
+        examId,
+        proctoringOptions: proctoringOptionsRef.current ?? null,
+      }));
       // Start sending frames
       intervalRef.current = setInterval(() => {
         if (ws.readyState !== WebSocket.OPEN) return;
@@ -235,23 +243,8 @@ const ProctoringEngine = ({ examId, onViolation, isSubmittingRef, proctoringOpti
         }
 
         // Log violations coming from Python AI
-        // Skip head pose violations — those are handled by the 3-warning system above
         if (data.violation_type && data.warning !== 'Normal') {
-          // Only log head pose violation when Python says cheating is true (after 3 warnings ignored)
-          if (data.violation_type === 'suspicious_movement') {
-            // The 3-warning system exhausted — now log the actual violation
-            logViolationRef.current(
-              data.violation_type,
-              data.warning,
-              null
-            );
-          } else {
-            logViolationRef.current(
-              data.violation_type,
-              data.warning,
-              null
-            );
-          }
+          logViolationRef.current(data.violation_type, data.warning, null);
         }
       } catch (e) {
         console.error('WS parse error:', e);
@@ -299,7 +292,16 @@ const ProctoringEngine = ({ examId, onViolation, isSubmittingRef, proctoringOpti
       audioCtxRef.current?.close();
       streamRef.current?.getTracks().forEach(t => t.stop());
     };
-  }, [examId]);
+  }, [examId]); // examId is stable; proctoringOptions is handled by the effect below
+
+  // ── Re-send proctoringOptions whenever exam data loads/changes ────
+  useEffect(() => {
+    proctoringOptionsRef.current = proctoringOptions;
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN || !proctoringOptions) return;
+    // Exam data just became available — push the real settings to Python
+    ws.send(JSON.stringify({ examId, proctoringOptions }));
+  }, [proctoringOptions, examId]);
 
   // ── Warning banner styles ─────────────────────────────────
   const bannerColors = {

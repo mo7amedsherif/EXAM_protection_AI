@@ -254,10 +254,87 @@ const CheatLogPage = () => {
           </div>
         )}
 
+        {/* ── Filtered logs view (flat list from filter/search) ─────── */}
+        {!selectedStudent && studentLogs.length > 0 && (
+          <div>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">Filtered Violations</h2>
+              <Button
+                onClick={() => setStudentLogs([])}
+                variant="outline"
+                className="px-6 py-3 rounded-xl font-semibold hover:scale-105 transition-all duration-200"
+              >
+                ← Clear Filter
+              </Button>
+            </div>
+            <Card className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-lg border border-gray-200/50 overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-gradient-to-r from-gray-50 to-gray-100/50 border-b border-gray-200">
+                    <TableHead className="py-5 font-bold text-gray-900">Timestamp</TableHead>
+                    <TableHead className="py-5 font-bold text-gray-900">Student</TableHead>
+                    <TableHead className="py-5 font-bold text-gray-900">Violation Type</TableHead>
+                    <TableHead className="py-5 font-bold text-gray-900">Description</TableHead>
+                    <TableHead className="py-5 font-bold text-gray-900">Severity</TableHead>
+                    <TableHead className="py-5 font-bold text-gray-900">Confidence</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {studentLogs.map((log) => (
+                    <TableRow key={log._id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors duration-200">
+                      <TableCell className="py-5 font-mono text-sm text-gray-700 font-semibold">
+                        {new Date(log.timestamp).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="py-5 text-gray-700 font-semibold">
+                        {log.student?.name || '—'}
+                      </TableCell>
+                      <TableCell className="py-5">
+                        <Badge className="bg-gradient-to-br from-blue-500 to-blue-600 text-white px-4 py-1.5 rounded-xl font-semibold shadow-md shadow-blue-500/30">
+                          {log.type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="py-5 text-gray-700 max-w-xs">{log.description}</TableCell>
+                      <TableCell className="py-5">
+                        <Badge className={`border-2 px-4 py-1.5 rounded-xl font-bold uppercase tracking-wide ${getSeverityColor(log.severity)}`}>
+                          {log.severity}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="py-5">
+                        {log.confidence != null ? (
+                          <div className="flex items-center gap-3">
+                            <div className="flex-1 bg-gray-200 rounded-full h-2 overflow-hidden">
+                              <div
+                                className={`h-2 rounded-full transition-all duration-500 ${
+                                  log.confidence >= 90
+                                    ? "bg-gradient-to-r from-red-500 to-red-600"
+                                    : log.confidence >= 75
+                                    ? "bg-gradient-to-r from-orange-500 to-orange-600"
+                                    : "bg-gradient-to-r from-yellow-500 to-yellow-600"
+                                }`}
+                                style={{ width: `${log.confidence}%` }}
+                              />
+                            </div>
+                            <span className={`font-bold text-sm ${getConfidenceColor(log.confidence)}`}>
+                              {log.confidence}%
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 text-sm">—</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Card>
+          </div>
+        )}
+
+        {/* ── Per-student drilldown timeline ───────────────────────── */}
         {selectedStudent && (
           <div>
             <Button
-              onClick={() => setSelectedStudent(null)}
+              onClick={() => { setSelectedStudent(null); setStudentLogs([]); }}
               variant="outline"
               className="mb-6 px-6 py-3 rounded-xl font-semibold hover:scale-105 transition-all duration-200"
             >
