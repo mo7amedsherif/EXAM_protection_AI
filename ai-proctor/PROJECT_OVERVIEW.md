@@ -1,6 +1,6 @@
 # AI-Proctored Exam System — Project Overview
 
-> **Last updated:** 2026-05-08
+> **Last updated:** 2026-06-09
 
 ---
 
@@ -41,6 +41,7 @@ A full-stack, AI-powered exam proctoring platform that allows **teachers** to cr
 |-----------|---------------------------------------------------------------|
 | Frontend  | React 18, Vite, TailwindCSS, shadcn/ui, Zustand, Axios       |
 | Backend   | Node.js, Express 5, Mongoose 9, JWT, bcryptjs                 |
+| Storage   | Cloudflare R2 (S3-compatible, via @aws-sdk/client-s3)         |
 | Database  | MongoDB (Atlas or local)                                      |
 | AI Engine | Python 3, FastAPI, OpenCV, MediaPipe, Ultralytics YOLOv8      |
 | DevTools  | Nodemon, Concurrently (single `npm run start:all` command)    |
@@ -53,10 +54,12 @@ A full-stack, AI-powered exam proctoring platform that allows **teachers** to cr
 ai-proctor/
 ├── backend/                          # Node.js REST API
 │   ├── config/
-│   │   └── db.js                     # MongoDB connection
+│   │   ├── db.js                     # MongoDB connection
+│   │   └── r2.js                     # Cloudflare R2 (S3) client
 │   ├── controllers/
 │   │   ├── cheatingLogController.js  # CRUD for cheating violations
 │   │   ├── examController.js         # Exam CRUD + toggle active
+│   │   ├── materialController.js     # Study materials CRUD + R2 streaming
 │   │   ├── questionController.js     # Question CRUD per exam
 │   │   ├── resultController.js       # Submit, view, delete, toggle visibility
 │   │   └── userController.js         # Register, login, profile
@@ -66,18 +69,23 @@ ai-proctor/
 │   ├── models/
 │   │   ├── cheatingLogModel.js       # Violation log schema
 │   │   ├── examModel.js             # Exam schema
+│   │   ├── materialModel.js         # Study material schema (R2 keys)
 │   │   ├── questionModel.js         # MCQ question schema
 │   │   ├── resultModel.js           # Student result schema
 │   │   └── userModel.js             # User schema (student/teacher)
 │   ├── routes/
 │   │   ├── cheatingLogRoutes.js      # /api/cheating-logs
 │   │   ├── examRoutes.js            # /api/exams
+│   │   ├── materialRoutes.js        # /api/materials
 │   │   ├── resultRoutes.js          # /api/results
 │   │   └── userRoutes.js            # /api/users
 │   ├── utils/
 │   │   ├── calculateMarks.js        # Score calculation utility
 │   │   └── generateToken.js         # JWT token generator
+│   ├── uploads/                     # Legacy (pre-R2); files now in Cloudflare R2
 │   ├── server.js                    # Express app entry point
+│   ├── api-documentation.md         # Full REST API reference with examples
+│   ├── postman-collection-updated.json  # Postman collection for testing
 │   ├── package.json
 │   └── .env
 │
@@ -96,17 +104,19 @@ ai-proctor/
 │       │   ├── LoginPage.jsx        # Student/Teacher login
 │       │   ├── RegisterPage.jsx     # Account registration
 │       │   ├── student/
-│       │   │   ├── StudentDashboard.jsx  # Browse & start exams
-│       │   │   ├── PreExamPage.jsx       # Pre-exam checks (AI, camera, eligibility)
-│       │   │   ├── ExamPage.jsx          # Live exam with timer + proctoring
-│       │   │   ├── ResultPage.jsx        # Post-submit result view
-│       │   │   └── MyResultsPage.jsx     # All student results history
+│       │   │   ├── StudentDashboard.jsx    # Browse & start exams
+│       │   │   ├── PreExamPage.jsx         # Pre-exam checks (AI, camera, eligibility)
+│       │   │   ├── ExamPage.jsx            # Live exam with timer + proctoring
+│       │   │   ├── ResultPage.jsx          # Post-submit result view
+│       │   │   ├── MyResultsPage.jsx       # All student results history
+│       │   │   └── StudentMaterialsPage.jsx # Browse & download study materials
 │       │   └── teacher/
-│       │       ├── TeacherDashboard.jsx  # Exam management cards
-│       │       ├── CreateExamPage.jsx    # Create new exam
-│       │       ├── ExamDetailPage.jsx    # View/edit questions
-│       │       ├── ExamResultsPage.jsx   # Student results + violations modal
-│       │       └── CheatLogPage.jsx      # Real-time cheating log viewer
+│       │       ├── TeacherDashboard.jsx    # Exam management cards
+│       │       ├── CreateExamPage.jsx      # Create new exam
+│       │       ├── ExamDetailPage.jsx      # View/edit questions
+│       │       ├── ExamResultsPage.jsx     # Student results + violations modal
+│       │       ├── CheatLogPage.jsx        # Real-time cheating log viewer
+│       │       └── TeacherMaterialsPage.jsx # Upload & manage study materials
 │       ├── store/
 │       │   └── authStore.js         # Zustand auth state (user, token, logout)
 │       ├── App.jsx                  # Route definitions
@@ -114,10 +124,13 @@ ai-proctor/
 │       └── index.css                # Global styles
 │
 └── python-ai/                        # AI Proctoring Engine
+    ├── __init__.py                  # Package root
     ├── config/
     │   └── settings.py              # Thresholds & env-based configuration
     ├── modules/
-    │   ├── __init__.py              # Module exports
+    │   ├── __init__.py              # Exports: FaceDetector, HeadPoseEstimator,
+    │   │                            #   HeadPoseLogic, SpeechDetector,
+    │   │                            #   SpeechLogic, ObjectDetector
     │   ├── face_detection.py        # MediaPipe face detection
     │   ├── head_pose.py             # Head pose estimation (yaw/pitch)
     │   ├── head_pose_logic.py       # Look-away timing logic
@@ -126,6 +139,7 @@ ai-proctor/
     │   └── speech_logic.py          # Speech timing logic
     ├── main.py                      # Detection orchestrator
     ├── server.py                    # FastAPI WebSocket server
+    ├── README.md                    # Python AI setup & usage guide
     ├── requirements.txt             # Python dependencies
     ├── yolov8s.pt                   # YOLOv8 model weights
     └── .env                         # Python environment config
@@ -192,6 +206,21 @@ ai-proctor/
 
 **Indexes:** `{ student, exam }`, `{ exam, type }`, `{ timestamp: -1 }`
 
+### Material (Study Materials)
+| Field         | Type       | Notes                                          |
+|---------------|------------|-------------------------------------------------|
+| title         | String     | Required, max 200 chars                          |
+| description   | String     | Optional, max 500 chars                          |
+| subject       | String     | Required, used for filtering                     |
+| teacher       | ObjectId   | Ref → User                                       |
+| fileName      | String     | Original file name (e.g. "Lecture1.pdf")         |
+| r2Key         | String     | R2 object key (e.g. "materials/123-file.pdf")    |
+| fileUrl       | String     | R2 public CDN URL for direct access              |
+| fileType      | String     | Enum: `pdf`, `word`, `powerpoint`, `other`       |
+| fileSize      | Number     | Size in bytes                                    |
+| isVisible     | Boolean    | Default `true` (hidden = invisible to students)  |
+| downloadCount | Number     | Auto-incremented on each download                |
+
 ---
 
 ## 6. API Endpoints
@@ -233,6 +262,22 @@ ai-proctor/
 | GET    | `/exam/:examId/summary`           | Teacher | Aggregated summary per student     |
 | GET    | `/exam/:examId/student/:studentId`| Teacher | Logs for specific student in exam  |
 
+### Study Materials — `/api/materials`
+| Method | Path                 | Access  | Description                                 |
+|--------|----------------------|---------|---------------------------------------------|
+| GET    | `/`                  | Auth    | List all visible materials (student view)    |
+| GET    | `/my`                | Teacher | List teacher's own materials (incl. hidden)  |
+| POST   | `/`                  | Teacher | Upload new material (multipart/form-data)    |
+| PUT    | `/:id`               | Teacher | Update material metadata only                |
+| PUT    | `/:id/file`          | Teacher | Replace file (streams new file to R2)        |
+| PATCH  | `/:id/visibility`    | Teacher | Toggle visibility (show/hide from students)  |
+| DELETE | `/:id`               | Teacher | Delete material (removes from R2 + DB)       |
+| GET    | `/:id/view-token`    | Auth    | Get short-lived view token + R2 URL          |
+| GET    | `/:id/download`      | Auth    | Increment download count + return R2 URL     |
+
+**File constraints:** PDF, Word (.doc/.docx), PowerPoint (.ppt/.pptx) only. Max 50 MB.
+**Upload flow:** Browser → multer temp disk → streamed to R2 in 4 parallel 5MB chunks → temp cleaned up.
+
 ---
 
 ## 7. Frontend Routes
@@ -250,7 +295,9 @@ ai-proctor/
 | `/student/exam/:id/pre`        | PreExamPage          | Student | Pre-exam system checks          |
 | `/student/exam/:id`            | ExamPage             | Student | Take exam (proctored)           |
 | `/student/result`              | ResultPage           | Student | Post-submission result view     |
-| `/student/my-results`          | MyResultsPage        | Student | All results history             |
+| `/student/my-results`          | MyResultsPage           | Student | All results history             |
+| `/student/materials`           | StudentMaterialsPage    | Student | Browse & download materials     |
+| `/teacher/materials`           | TeacherMaterialsPage    | Teacher | Upload & manage materials       |
 
 ---
 
@@ -282,6 +329,8 @@ ai-proctor/
 - ✅ Anti-cheat: copy/paste, right-click, tab-switch, devtools all blocked
 - ✅ "My Results" page with score cards, percentage circles, pass/fail
 - ✅ Results visibility controlled by teacher
+- ✅ Study Materials page: browse, search, filter by subject
+- ✅ Open files in browser (PDF viewer) or download via R2 CDN
 
 ### Teacher Side
 - ✅ Dashboard with stats (total exams, active, students, pass rate)
@@ -293,6 +342,9 @@ ai-proctor/
 - ✅ Toggle result visibility per student (👁 icon)
 - ✅ Delete individual results (🗑 icon)
 - ✅ Real-time cheating log viewer (CheatLogPage)
+- ✅ Study Materials management: upload, edit, replace, hide, delete
+- ✅ Upload progress bar with streaming to Cloudflare R2
+- ✅ Auto-fill title from selected filename
 
 ---
 
@@ -305,6 +357,13 @@ NODE_ENV=development
 MONGO_URI=mongodb+srv://...
 JWT_SECRET=your_jwt_secret
 ALLOWED_ORIGINS=http://localhost:5173
+
+# Cloudflare R2 Storage
+R2_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+R2_ACCESS_KEY_ID=your_r2_access_key
+R2_SECRET_ACCESS_KEY=your_r2_secret_key
+R2_BUCKET_NAME=ai-proctor-materials
+R2_PUBLIC_URL=https://pub-<hash>.r2.dev
 ```
 
 ### Python AI (`.env`)
@@ -404,5 +463,6 @@ ResultPage — Shows score summary
 3. **No pagination** — Results and exam lists load all records at once
 4. **Single browser** — No session management to prevent multi-device login
 5. **No exam scheduling** — Exams are available immediately when active
+6. **R2 public URLs** — Material files use public R2 URLs; access control relies on hiding the URL from students (no signed URLs yet)
 
 ---

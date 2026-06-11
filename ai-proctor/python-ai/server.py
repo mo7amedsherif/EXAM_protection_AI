@@ -54,6 +54,13 @@ async def websocket_endpoint(websocket: WebSocket):
 
     audio_buffer = bytearray()
     exam_id = None
+    proctor_opts = {  # defaults: everything enabled
+        "faceDetection": True,
+        "headPose": True,
+        "objectDetection": True,
+        "voiceDetection": True,
+        "tabSwitchDetection": True,
+    }
 
     try:
         while True:
@@ -62,8 +69,11 @@ async def websocket_endpoint(websocket: WebSocket):
 
                 # Binary = audio chunk for speech detection
                 if "bytes" in message:
+                    # Skip audio processing if voice detection is disabled
+                    if not proctor_opts.get("voiceDetection", True):
+                        continue
                     audio_buffer.extend(message["bytes"])
-                    CHUNK_SIZE = 960
+                    CHUNK_SIZE = 1200
                     print(f"Received audio bytes. Buffer size: {len(audio_buffer)}")
                     while len(audio_buffer) >= CHUNK_SIZE:
                         chunk = bytes(audio_buffer[:CHUNK_SIZE])
@@ -92,6 +102,9 @@ async def websocket_endpoint(websocket: WebSocket):
                         if "examId" in meta:
                             exam_id = meta["examId"]
                             print(f"Exam ID set: {exam_id}")
+                        if "proctoringOptions" in meta and isinstance(meta["proctoringOptions"], dict):
+                            proctor_opts.update(meta["proctoringOptions"])
+                            print(f"Proctoring options set: {proctor_opts}")
                     except:
                         pass
                     continue
@@ -113,23 +126,32 @@ async def websocket_endpoint(websocket: WebSocket):
                 if frame is None:
                     continue
 
-                # Face detection
-                faces = face_detector.detect_faces(frame)
-                for (x, y, w, h) in faces:
-                    cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
+                # Face detection (skip if disabled)
+                faces = []
+                if proctor_opts.get("faceDetection", True):
+                    faces = face_detector.detect_faces(frame)
+                    for (x, y, w, h) in faces:
+                        cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
 
-                # Head pose
-                direction, angle = pose_estimator.get_pose(frame)
-                cheating = pose_logic.update(direction)
+                # Head pose (skip if disabled)
+                direction = "Forward"
+                head_pose_result = {"cheating": False, "warning_level": 0, "warning_active": False, "direction": "Forward", "reset": False}
+                cheating = False
+                if proctor_opts.get("headPose", True):
+                    direction, angle = pose_estimator.get_pose(frame)
+                    head_pose_result = pose_logic.update(direction)
+                    cheating = head_pose_result.get("cheating", False)
 
 
                 # Speech (state managed by binary audio above)
                 speech_cheating = speech_logic.cheating
 
-                # YOLO object detection
-                detections = object_detector.detect(frame)
+                # YOLO object detection (skip if disabled)
+                detections = []
                 phone_detected = False
                 person_count = 0
+                if proctor_opts.get("objectDetection", True):
+                    detections = object_detector.detect(frame)
 
                 for det in detections:
                     label = det["label"]
@@ -195,7 +217,13 @@ async def websocket_endpoint(websocket: WebSocket):
                     "warnings":       warnings,
                     "violation_type": violation_type,
                     "exam_id":        exam_id,
-                    "image":          f"data:image/jpeg;base64,{encoded_img}"
+                    "image":          f"data:image/jpeg;base64,{encoded_img}",
+                    "head_warning": {
+                        "warning_level": head_pose_result.get("warning_level", 0),
+                        "warning_active": head_pose_result.get("warning_active", False),
+                        "direction": head_pose_result.get("direction", "Forward"),
+                        "reset": head_pose_result.get("reset", False),
+                    }
                 }
 
                 await websocket.send_text(json.dumps(response))

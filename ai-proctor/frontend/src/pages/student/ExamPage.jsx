@@ -26,6 +26,7 @@ const ExamPage = () => {
 
   // Keep a ref to the latest handleSubmit so effects never call a stale closure
   const submitRef = useRef(null);
+  const isSubmittingRef = useRef(false);
   useEffect(() => {
     submitRef.current = handleSubmit;
   });
@@ -93,6 +94,19 @@ const ExamPage = () => {
     if (submitting) return;
     setSubmitting(true);
 
+    // Mark as submitting so fullscreen exit is NOT logged as a violation
+    isSubmittingRef.current = true;
+
+    // Exit fullscreen as part of the submit flow
+    try {
+      const fsElement = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
+      if (fsElement) {
+        await document.exitFullscreen?.();
+      }
+    } catch {
+      // Ignore if already exited
+    }
+
     const answersArray = questions.map((q) => ({
       question: q._id,
       selectedOption: answers[q._id] !== undefined ? answers[q._id] : null,
@@ -113,6 +127,7 @@ const ExamPage = () => {
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to submit exam');
       setSubmitting(false);
+      isSubmittingRef.current = false;
     }
   }, [submitting, questions, answers, id, navigate]);
 
@@ -277,7 +292,7 @@ const ExamPage = () => {
         </div>
       </nav>
 
-      <ProctoringEngine examId={id} onViolation={handleViolation} />
+      <ProctoringEngine examId={id} onViolation={handleViolation} isSubmittingRef={isSubmittingRef} proctoringOptions={exam?.proctoringOptions} />
 
       {/* Main Content */}
       <div className="max-w-4xl mx-auto py-16 px-8">

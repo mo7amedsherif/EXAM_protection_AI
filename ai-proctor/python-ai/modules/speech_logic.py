@@ -5,6 +5,8 @@ class SpeechLogic:
     def __init__(self):
         self.speech_start_time = None
         self.cheating = False
+        # Use 3.0 seconds to filter out short sounds like coughs, sneezes
+        self.SPEECH_TIME_LIMIT = max(getattr(settings, 'SPEECH_TIME_LIMIT', 3.0), 3.0)
 
     def reset(self):
         self.speech_start_time = None
@@ -16,7 +18,7 @@ class SpeechLogic:
                 self.speech_start_time = time.time()
                 
             elapsed = time.time() - self.speech_start_time
-            if elapsed >= settings.SPEECH_TIME_LIMIT:
+            if elapsed >= self.SPEECH_TIME_LIMIT:
                 self.cheating = True
         else:
             self.speech_start_time = None

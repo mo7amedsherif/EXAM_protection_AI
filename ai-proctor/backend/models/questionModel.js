@@ -5,7 +5,7 @@ const questionSchema = new mongoose.Schema(
     exam: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Exam",
-      required: true,
+      required: false,
     },
     text: {
       type: String,
@@ -34,6 +34,19 @@ const questionSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    teacher: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    source: {
+      type: String,
+      enum: ['manual', 'ai_generated', 'warehouse'],
+      default: 'manual',
+    },
+    tags: [{
+      type: String,
+      trim: true,
+    }],
   },
   { timestamps: true }
 );

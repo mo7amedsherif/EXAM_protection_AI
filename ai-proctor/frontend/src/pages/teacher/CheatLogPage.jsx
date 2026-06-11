@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from '../../api/axios';
-import Navbar from '../../components/Navbar';
 import { Card } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
@@ -93,8 +92,6 @@ const CheatLogPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-red-50/10 to-gray-50">
-      <Navbar />
-      
       {/* Header */}
       <div className="bg-white/80 backdrop-blur-md border-b border-gray-200/50">
         <div className="max-w-7xl mx-auto px-8 py-8">

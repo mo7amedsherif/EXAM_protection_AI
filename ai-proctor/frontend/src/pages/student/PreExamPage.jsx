@@ -4,7 +4,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from '../../api/axios';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
-import Navbar from '../../components/Navbar';
 
 // ── Constants ────────────────────────────────────────────────────────
 const WS_URL = 'ws://localhost:8000/ws';
@@ -150,7 +149,6 @@ const PreExamPage = () => {
   if (pageReady && alreadyCompleted) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/20 to-gray-50">
-        <Navbar />
         <div className="max-w-lg mx-auto py-20 px-6">
           <Card className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-gray-200/50 p-10 text-center">
             <div className="text-6xl mb-4">🎓</div>
@@ -176,7 +174,6 @@ const PreExamPage = () => {
   if (!pageReady) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/20 to-gray-50">
-        <Navbar />
         <div className="max-w-lg mx-auto py-20 px-6">
           <Card className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-gray-200/50 p-10">
             <div className="flex flex-col items-center mb-8">
@@ -204,7 +201,6 @@ const PreExamPage = () => {
   // ── STATE C / D: Ready or AI unavailable ────────────────────
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/20 to-gray-50">
-      <Navbar />
       <div className="max-w-2xl mx-auto py-12 px-6">
         <Card className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-gray-200/50 p-10">
           {/* Header */}

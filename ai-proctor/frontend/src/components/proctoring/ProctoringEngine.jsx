@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import Webcam from 'react-webcam';
 import axios from '../../api/axios';
 
@@ -8,7 +8,59 @@ const WS_URL = 'ws://localhost:8000/ws';
 const GRACE_PERIOD_MS = 8000;
 const FULLSCREEN_GRACE_MS = 12000;
 
-const ProctoringEngine = ({ examId, onViolation }) => {
+// ── Audio warning beep generator ────────────────────────────────────
+function playWarningBeep(level = 1) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+    
+    // Higher pitch and volume for higher warning levels
+    const frequencies = [520, 680, 880]; // level 1, 2, 3
+    const volumes = [0.3, 0.5, 0.7];
+    const durations = [0.4, 0.5, 0.6];
+    
+    const idx = Math.min(level - 1, 2);
+    oscillator.frequency.value = frequencies[idx];
+    oscillator.type = 'sine';
+    gainNode.gain.value = volumes[idx];
+    
+    // Envelope: fade in then fade out
+    const now = ctx.currentTime;
+    const duration = durations[idx];
+    gainNode.gain.setValueAtTime(0, now);
+    gainNode.gain.linearRampToValueAtTime(volumes[idx], now + 0.05);
+    gainNode.gain.linearRampToValueAtTime(0, now + duration);
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+    oscillator.start(now);
+    oscillator.stop(now + duration);
+    
+    // For levels 2 and 3, play a double beep
+    if (level >= 2) {
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.frequency.value = frequencies[idx];
+      osc2.type = 'sine';
+      const start2 = now + duration + 0.1;
+      gain2.gain.setValueAtTime(0, start2);
+      gain2.gain.linearRampToValueAtTime(volumes[idx], start2 + 0.05);
+      gain2.gain.linearRampToValueAtTime(0, start2 + duration);
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.start(start2);
+      osc2.stop(start2 + duration);
+    }
+    
+    // Cleanup
+    setTimeout(() => ctx.close(), 3000);
+  } catch (e) {
+    console.warn('Could not play warning beep:', e);
+  }
+}
+
+const ProctoringEngine = ({ examId, onViolation, isSubmittingRef, proctoringOptions }) => {
   const webcamRef        = useRef(null);
   const wsRef            = useRef(null);
   const intervalRef      = useRef(null);
@@ -19,6 +71,10 @@ const ProctoringEngine = ({ examId, onViolation }) => {
   const violationCountRef = useRef(0);
   const previewImgRef    = useRef(null);
   const examStartTime    = useRef(Date.now());
+
+  // ── Head pose warning state ───────────────────────────────
+  const [headWarning, setHeadWarning] = useState(null);
+  const lastWarningLevelRef = useRef(0);
 
   // ── Debounced violation logger ─────────────────────────────
   const logViolation = useCallback((type, description, confidence = null) => {
@@ -57,11 +113,12 @@ const ProctoringEngine = ({ examId, onViolation }) => {
   // ── Browser event violations ───────────────────────────────
   useEffect(() => {
     const onVisibility = () => {
-      if (document.hidden)
+      if (document.hidden && proctoringOptions?.tabSwitchDetection !== false)
         logViolation('tab_switch', 'Student switched browser tab');
     };
     const onFullscreen = () => {
-      if (!document.fullscreenElement)
+      const fsElement = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
+      if (!fsElement && !(isSubmittingRef?.current))
         logViolation('fullscreen_exit', 'Student exited fullscreen');
     };
     const onCopy  = () => logViolation('copy_paste_attempt', 'Copy attempt');
@@ -81,8 +138,10 @@ const ProctoringEngine = ({ examId, onViolation }) => {
         logViolation('copy_paste_attempt', `Ctrl+${e.key.toUpperCase()}`);
       }
     };
-    const onBlur = () =>
-      logViolation('tab_switch', 'Window lost focus');
+    const onBlur = () => {
+      if (proctoringOptions?.tabSwitchDetection !== false)
+        logViolation('tab_switch', 'Window lost focus');
+    };
 
     const checkDevTools = setInterval(() => {
       if (window.outerWidth - window.innerWidth > 160 ||
@@ -108,7 +167,7 @@ const ProctoringEngine = ({ examId, onViolation }) => {
       document.removeEventListener('keydown', onKey);
       window.removeEventListener('blur', onBlur);
       clearInterval(checkDevTools);
-      if (document.fullscreenElement) document.exitFullscreen?.();
+      // Don't exit fullscreen here — ExamPage handles it during submit
     };
   }, [logViolation]);
 
@@ -125,7 +184,7 @@ const ProctoringEngine = ({ examId, onViolation }) => {
     ws.onopen = () => {
       console.log('Python AI proctoring connected');
       // Send examId first
-      ws.send(JSON.stringify({ examId }));
+      ws.send(JSON.stringify({ examId, proctoringOptions }));
       // Start sending frames
       intervalRef.current = setInterval(() => {
         if (ws.readyState !== WebSocket.OPEN) return;
@@ -149,13 +208,50 @@ const ProctoringEngine = ({ examId, onViolation }) => {
           previewImgRef.current.src = data.image;
         }
 
+        // ── Handle head pose warnings ─────────────────────────
+        if (data.head_warning) {
+          const hw = data.head_warning;
+          
+          if (hw.reset) {
+            // Student returned to forward — dismiss all warnings
+            setHeadWarning(null);
+            lastWarningLevelRef.current = 0;
+          } else if (hw.warning_active && hw.warning_level > 0) {
+            // New or continued warning
+            setHeadWarning({
+              level: hw.warning_level,
+              direction: hw.direction,
+            });
+            
+            // Play audio beep when warning level increases
+            if (hw.warning_level > lastWarningLevelRef.current) {
+              lastWarningLevelRef.current = hw.warning_level;
+              playWarningBeep(hw.warning_level);
+            }
+          } else if (!hw.warning_active && hw.warning_level === 0) {
+            setHeadWarning(null);
+            lastWarningLevelRef.current = 0;
+          }
+        }
+
         // Log violations coming from Python AI
+        // Skip head pose violations — those are handled by the 3-warning system above
         if (data.violation_type && data.warning !== 'Normal') {
-          logViolationRef.current(
-            data.violation_type,
-            data.warning,
-            null
-          );
+          // Only log head pose violation when Python says cheating is true (after 3 warnings ignored)
+          if (data.violation_type === 'suspicious_movement') {
+            // The 3-warning system exhausted — now log the actual violation
+            logViolationRef.current(
+              data.violation_type,
+              data.warning,
+              null
+            );
+          } else {
+            logViolationRef.current(
+              data.violation_type,
+              data.warning,
+              null
+            );
+          }
         }
       } catch (e) {
         console.error('WS parse error:', e);
@@ -168,33 +264,33 @@ const ProctoringEngine = ({ examId, onViolation }) => {
       clearInterval(intervalRef.current);
     };
 
-    // ── Microphone audio streaming ───────────────────────────
-    navigator.mediaDevices.getUserMedia({ audio: true, video: false })
-      .then(stream => {
-        streamRef.current = stream;
-        const audioCtx = new AudioContext({ sampleRate: 16000 });
-        audioCtxRef.current = audioCtx;
-        const source = audioCtx.createMediaStreamSource(stream);
-        // ScriptProcessor for PCM streaming (compatible)
-        const processor = audioCtx.createScriptProcessor(4096, 1, 1);
-        processorRef.current = processor;
-        processor.onaudioprocess = (e) => {
-          if (ws.readyState !== WebSocket.OPEN) return;
-          const input = e.inputBuffer.getChannelData(0);
-          // Convert Float32 to Int16 PCM
-          const pcm = new Int16Array(input.length);
-          for (let i = 0; i < input.length; i++) {
-            pcm[i] = Math.max(-32768, Math.min(32767, input[i] * 32768));
-          }
-          ws.send(pcm.buffer);
-        };
-        source.connect(processor);
-        processor.connect(audioCtx.destination);
-      })
-      .catch(err => {
-        console.warn('Mic access denied:', err.message);
-        logViolationRef.current('microphone_muted', 'Microphone access denied');
-      });
+    // ── Microphone audio streaming (skip if voice detection is disabled) ──
+    if (proctoringOptions?.voiceDetection !== false) {
+      navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+        .then(stream => {
+          streamRef.current = stream;
+          const audioCtx = new AudioContext({ sampleRate: 16000 });
+          audioCtxRef.current = audioCtx;
+          const source = audioCtx.createMediaStreamSource(stream);
+          const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+          processorRef.current = processor;
+          processor.onaudioprocess = (e) => {
+            if (ws.readyState !== WebSocket.OPEN) return;
+            const input = e.inputBuffer.getChannelData(0);
+            const pcm = new Int16Array(input.length);
+            for (let i = 0; i < input.length; i++) {
+              pcm[i] = Math.max(-32768, Math.min(32767, input[i] * 32768));
+            }
+            ws.send(pcm.buffer);
+          };
+          source.connect(processor);
+          processor.connect(audioCtx.destination);
+        })
+        .catch(err => {
+          console.warn('Mic access denied:', err.message);
+          logViolationRef.current('microphone_muted', 'Microphone access denied');
+        });
+    }
 
     return () => {
       clearInterval(intervalRef.current);
@@ -205,46 +301,120 @@ const ProctoringEngine = ({ examId, onViolation }) => {
     };
   }, [examId]);
 
+  // ── Warning banner styles ─────────────────────────────────
+  const bannerColors = {
+    1: { bg: '#FEF3C7', border: '#F59E0B', text: '#92400E', icon: '⚠️' },
+    2: { bg: '#FED7AA', border: '#F97316', text: '#9A3412', icon: '🔶' },
+    3: { bg: '#FEE2E2', border: '#EF4444', text: '#991B1B', icon: '🔴' },
+  };
+
   return (
-    <div style={{
-      position: 'fixed',
-      bottom: 16,
-      right: 16,
-      zIndex: 9999,
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      gap: 4,
-    }}>
-      {/* Hidden webcam — only used to capture frames */}
-      <Webcam
-        ref={webcamRef}
-        audio={false}
-        // style={{ display: 'none' }}
-        videoConstraints={{ width: 320, height: 240, facingMode: 'user' }}
-      />
-      {/* Annotated frame coming back from Python */}
-      <img
-        ref={previewImgRef}
-        alt="AI Proctoring Feed"
-        style={{
-          width: 200,
-          height: 150,
-          borderRadius: 8,
-          border: '2px solid #4f46e5',
-          objectFit: 'cover',
-          background: '#000',
-        }}
-      />
-      <span style={{
-        fontSize: 11,
-        fontWeight: 600,
-        color: '#4f46e5',
-        letterSpacing: '0.05em',
+    <>
+      {/* ── Head pose warning banner ───────────────────────────── */}
+      {headWarning && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 10001,
+          background: bannerColors[headWarning.level]?.bg || '#FEF3C7',
+          borderBottom: `3px solid ${bannerColors[headWarning.level]?.border || '#F59E0B'}`,
+          padding: '12px 24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 12,
+          animation: 'slideDown 0.3s ease',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+        }}>
+          <span style={{ fontSize: 24 }}>
+            {bannerColors[headWarning.level]?.icon}
+          </span>
+          <div style={{ textAlign: 'center' }}>
+            <p style={{
+              margin: 0,
+              fontWeight: 700,
+              fontSize: 15,
+              color: bannerColors[headWarning.level]?.text,
+            }}>
+              Warning {headWarning.level}/3 — Please look at the screen!
+            </p>
+            <p style={{
+              margin: '2px 0 0',
+              fontSize: 13,
+              color: bannerColors[headWarning.level]?.text,
+              opacity: 0.8,
+            }}>
+              You are looking {headWarning.direction?.toLowerCase() || 'away'}. Return your gaze to avoid a violation.
+            </p>
+          </div>
+          <div style={{
+            display: 'flex',
+            gap: 4,
+          }}>
+            {[1, 2, 3].map((i) => (
+              <div key={i} style={{
+                width: 10,
+                height: 10,
+                borderRadius: '50%',
+                background: i <= headWarning.level
+                  ? bannerColors[headWarning.level]?.border
+                  : '#D1D5DB',
+                transition: 'all 0.3s ease',
+              }} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Camera + AI preview ─────────────────────────────────── */}
+      <div style={{
+        position: 'fixed',
+        bottom: 16,
+        right: 16,
+        zIndex: 9999,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 4,
       }}>
-        🔴 AI Proctoring Active
-      </span>
-    </div>
+        {/* Hidden webcam — only used to capture frames */}
+        <Webcam
+          ref={webcamRef}
+          audio={false}
+          videoConstraints={{ width: 320, height: 240, facingMode: 'user' }}
+        />
+        {/* Annotated frame coming back from Python */}
+        <img
+          ref={previewImgRef}
+          alt="AI Proctoring Feed"
+          style={{
+            width: 200,
+            height: 150,
+            borderRadius: 8,
+            border: '2px solid #4f46e5',
+            objectFit: 'cover',
+            background: '#000',
+          }}
+        />
+        <span style={{
+          fontSize: 11,
+          fontWeight: 600,
+          color: '#4f46e5',
+          letterSpacing: '0.05em',
+        }}>
+          🔴 AI Proctoring Active
+        </span>
+      </div>
+
+      <style>{`
+        @keyframes slideDown {
+          from { transform: translateY(-100%); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+      `}</style>
+    </>
   );
 };
 

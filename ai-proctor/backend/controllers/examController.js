@@ -6,7 +6,7 @@ const Question = require("../models/questionModel");
 // @route  POST /api/exams
 // @access Teacher only
 const createExam = asyncHandler(async (req, res) => {
-  const { title, description, duration } = req.body;
+  const { title, description, duration, proctoringOptions } = req.body;
 
   if (!title || !duration) {
     res.status(400);
@@ -18,6 +18,7 @@ const createExam = asyncHandler(async (req, res) => {
     description,
     duration,
     teacher: req.user._id,
+    proctoringOptions,
   });
 
   res.status(201).json(exam);
@@ -73,7 +74,7 @@ const updateExam = asyncHandler(async (req, res) => {
     throw new Error("Not authorized to update this exam");
   }
 
-  const { title, description, duration, isActive } = req.body;
+  const { title, description, duration, isActive, proctoringOptions } = req.body;
 
   if (duration !== undefined && duration < 1) {
     res.status(400);
@@ -84,6 +85,7 @@ const updateExam = asyncHandler(async (req, res) => {
   exam.description = description ?? exam.description;
   exam.duration    = duration    ?? exam.duration;
   exam.isActive    = isActive    ?? exam.isActive;
+  exam.proctoringOptions = proctoringOptions ?? exam.proctoringOptions;
 
   const updated = await exam.save();
   res.json(updated);

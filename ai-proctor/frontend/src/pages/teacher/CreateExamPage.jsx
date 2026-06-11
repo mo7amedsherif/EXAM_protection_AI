@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from '../../api/axios';
-import Navbar from '../../components/Navbar';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -12,6 +11,13 @@ const CreateExamPage = () => {
     title: '',
     description: '',
     duration: '',
+  });
+  const [proctoringOptions, setProctoringOptions] = useState({
+    faceDetection: true,
+    headPose: true,
+    objectDetection: true,
+    voiceDetection: true,
+    tabSwitchDetection: true,
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -30,6 +36,7 @@ const CreateExamPage = () => {
       const response = await axios.post('/exams', {
         ...formData,
         duration: parseInt(formData.duration),
+        proctoringOptions,
       });
       navigate(`/teacher/exam/${response.data._id}`);
     } catch (err) {
@@ -41,8 +48,6 @@ const CreateExamPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/20 to-gray-50">
-      <Navbar />
-      
       {/* Header */}
       <div className="bg-white/80 backdrop-blur-md border-b border-gray-200/50">
         <div className="max-w-7xl mx-auto px-8 py-8">
@@ -102,6 +107,43 @@ const CreateExamPage = () => {
                 required
                 min="1"
               />
+            </div>
+
+            {/* ── Proctoring Options ────────────────────────────── */}
+            <div className="pt-6 mt-2 border-t border-gray-200">
+              <h3 className="text-lg font-bold text-gray-900 mb-1">Proctoring Options</h3>
+              <p className="text-sm text-gray-500 mb-5">Toggle AI monitoring features for this exam</p>
+              <div className="space-y-4">
+                {[
+                  { key: 'faceDetection', label: 'Face Detection', desc: 'Detect if no face or multiple faces are visible' },
+                  { key: 'headPose', label: 'Head Pose Tracking', desc: 'Monitor if student looks away from screen' },
+                  { key: 'objectDetection', label: 'Object Detection', desc: 'Detect phones or other unauthorized items' },
+                  { key: 'voiceDetection', label: 'Voice Detection', desc: 'Detect if student is speaking during exam' },
+                  { key: 'tabSwitchDetection', label: 'Tab Switch Detection', desc: 'Detect if student switches tabs or windows' },
+                ].map(({ key, label, desc }) => (
+                  <div key={key} className="flex items-center justify-between p-4 rounded-xl border-2 border-gray-100 hover:border-gray-200 transition-all duration-200">
+                    <div>
+                      <p className="font-semibold text-gray-800 text-sm">{label}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setProctoringOptions(prev => ({ ...prev, [key]: !prev[key] }))}
+                      className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 focus:outline-none ${
+                        proctoringOptions[key]
+                          ? 'bg-gradient-to-r from-blue-500 to-blue-600 shadow-md shadow-blue-500/30'
+                          : 'bg-gray-300'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-all duration-300 ${
+                          proctoringOptions[key] ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <Button

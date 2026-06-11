@@ -52,6 +52,7 @@ const addQuestion = asyncHandler(async (req, res) => {
     options,
     correctOption,
     marks,
+    teacher: req.user._id,
   });
 
   res.status(201).json(question);
@@ -103,7 +104,7 @@ const deleteQuestion = asyncHandler(async (req, res) => {
     throw new Error('Question not found');
   }
 
-  if (question.exam.toString() !== req.params.examId) {
+  if (!question.exam || question.exam.toString() !== req.params.examId) {
     res.status(400);
     throw new Error('Question does not belong to this exam');
   }
@@ -142,6 +143,7 @@ const createQuestion = asyncHandler(async (req, res) => {
     options,
     correctOption,
     marks,
+    teacher: req.user._id,
   });
 
   res.status(201).json(question);
@@ -246,6 +248,76 @@ const toggleActivateQuestion = asyncHandler(async (req, res) => {
   });
 });
 
+// @desc   Get teacher's question warehouse
+// @route  GET /api/questions/warehouse
+// @access Teacher only
+const getWarehouse = asyncHandler(async (req, res) => {
+  const { search, source, tag } = req.query;
+  
+  // Find all exams belonging to this teacher to match questions where teacher field might be missing
+  const teacherExams = await Exam.find({ teacher: req.user._id }).select('_id');
+  const examIds = teacherExams.map(e => e._id);
+
+  const filter = {
+    $or: [
+      { teacher: req.user._id },
+      { exam: { $in: examIds } }
+    ]
+  };
+  
+  const query = { $and: [filter] };
+
+  if (search) {
+    query.$and.push({ text: { $regex: search, $options: 'i' } });
+  }
+  if (source) {
+    query.$and.push({ source });
+  }
+  if (tag) {
+    query.$and.push({ tags: { $in: [tag] } });
+  }
+
+  const questions = await Question.find(query)
+    .populate('exam', 'title')
+    .sort('-createdAt');
+  res.json(questions);
+});
+
+// @desc   Bulk add questions to an exam
+// @route  POST /api/exams/:examId/questions/bulk
+// @access Teacher only
+const bulkAddQuestions = asyncHandler(async (req, res) => {
+  const exam = await Exam.findById(req.params.examId);
+  if (!exam) {
+    res.status(404);
+    throw new Error('Exam not found');
+  }
+  if (exam.teacher.toString() !== req.user._id.toString()) {
+    res.status(403);
+    throw new Error('Not authorized');
+  }
+
+  const { questions } = req.body;
+  if (!questions || !Array.isArray(questions) || questions.length === 0) {
+    res.status(400);
+    throw new Error('Please provide an array of questions');
+  }
+
+  const toCreate = questions.map(q => ({
+    exam: exam._id,
+    text: q.text,
+    options: q.options,
+    correctOption: q.correctOption,
+    marks: q.marks || 1,
+    teacher: req.user._id,
+    source: q.source || 'manual',
+    tags: q.tags || [],
+  }));
+
+  const created = await Question.insertMany(toCreate);
+  res.status(201).json(created);
+});
+
 module.exports = { 
   addQuestion, 
   getQuestions, 
@@ -254,4 +326,6 @@ module.exports = {
   getQuestion,
   updateQuestion,
   toggleActivateQuestion,
+  getWarehouse,
+  bulkAddQuestions,
 };

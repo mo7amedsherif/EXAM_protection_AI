@@ -12,7 +12,9 @@ const {
   addQuestion,
   getQuestions,
   deleteQuestion,
+  bulkAddQuestions,
 } = require("../controllers/questionController");
+const { generateQuestions, aiUpload } = require("../controllers/aiQuestionController");
 const { protect, authorizeRoles } = require("../middleware/authMiddleware");
 
 router.use(protect);
@@ -29,6 +31,12 @@ router.route("/:id")
 router.route("/:examId/questions")
   .get(getQuestions)
   .post(authorizeRoles("teacher"), addQuestion);
+
+router.route("/:examId/questions/bulk")
+  .post(authorizeRoles("teacher"), bulkAddQuestions);
+
+router.route("/:examId/questions/generate")
+  .post(authorizeRoles("teacher"), aiUpload.single("file"), generateQuestions);
 
 router.route("/:examId/questions/:questionId")
   .delete(authorizeRoles("teacher"), deleteQuestion);

@@ -7,7 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js ",
     "dev": "nodemon server.js ",
-    "start:all": "npx concurrently -c \"yellow,blue,magenta\" -n \"BACKEND,FRONTEND,PYTHON\" \"npm run dev\" \"cd ../frontend && npm run dev\" \"cd ../python-ai && .\\venv\\Scripts\\python server.py\""
+    "sa": "npx concurrently -c \"yellow,blue,magenta\" -n \"BACKEND,FRONTEND,PYTHON\" \"npm run dev\" \"cd ../frontend && npm run dev\" \"cd ../python-ai && .\\venv\\Scripts\\python server.py\""
   },
   "keywords": [],
   "author": "",
@@ -16,6 +16,8 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1045.0",
     "@aws-sdk/lib-storage": "^3.1045.0",
+    "@google/genai": "^2.8.0",
+    "@google/generative-ai": "^0.24.1",
     "axios": "^1.15.2",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
@@ -24,9 +26,11 @@
     "express-async-handler": "^1.2.0",
     "express-rate-limit": "^8.5.0",
     "jsonwebtoken": "^9.0.3",
+    "mammoth": "^1.12.0",
     "mongodb": "^7.2.0",
     "mongoose": "^9.5.0",
-    "multer": "^1.4.5-lts.1"
+    "multer": "^1.4.5-lts.1",
+    "pdf-parse": "^2.4.5"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"

@@ -1,5 +1,4 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import Navbar from '../../components/Navbar';
 import { Card } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
@@ -13,7 +12,6 @@ const ResultPage = () => {
   if (!result) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-red-50/10 to-gray-50">
-        <Navbar />
         <div className="max-w-2xl mx-auto py-16 px-8">
           <Card className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-red-200/50 p-10">
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl mb-6">
@@ -57,8 +55,6 @@ const ResultPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-green-50/10 to-gray-50">
-      <Navbar />
-      
       {/* Header */}
       <div className="bg-white/80 backdrop-blur-md border-b border-gray-200/50">
         <div className="max-w-7xl mx-auto px-8 py-8">

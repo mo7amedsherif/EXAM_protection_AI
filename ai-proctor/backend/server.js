@@ -28,6 +28,7 @@ app.use("/api/exams",         require("./routes/examRoutes"));
 app.use("/api/results",       require("./routes/resultRoutes"));
 app.use("/api/cheating-logs", require("./routes/cheatingLogRoutes"));
 app.use("/api/materials",     require("./routes/materialRoutes"));
+app.use('/api/questions', require('./routes/questionRoutes'));
 
 app.use(errorHandler);
 

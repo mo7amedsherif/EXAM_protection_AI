@@ -27,15 +27,17 @@ ai v 5/
 └── ai-proctor/
     ├── backend/
     │   ├── api-documentation.md    (Markdown API docs: endpoints, request/response examples, error codes)
-    │   ├── package.json            (npm manifest: Express 5.2.1, Mongoose 9.5.0, JWT, bcryptjs, cors, dotenv, express-rate-limit, express-async-handler, axios, nodemon)
+    │   ├── package.json            (npm manifest: Express 5.2.1, Mongoose 9.5.0, JWT, bcryptjs, cors, dotenv, express-rate-limit, express-async-handler, axios, multer, @aws-sdk/client-s3, @aws-sdk/lib-storage, nodemon)
     │   ├── package-lock.json       (npm lockfile)
     │   ├── postman-collection-updated.json  (Postman v2.1 collection with tests for all endpoints)
     │   ├── server.js               (Express app entry: CORS, JSON parser, health check, route registration, error handler)
     │   ├── config/
-    │   │   └── db.js               (MongoDB connection via Mongoose, uses process.env.MONGO_URI)
+    │   │   ├── db.js               (MongoDB connection via Mongoose, uses process.env.MONGO_URI)
+    │   │   └── r2.js               (Cloudflare R2 S3-compatible client, uses process.env.R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY)
     │   ├── controllers/
     │   │   ├── cheatingLogController.js   (logCheatingEvent, getExamCheatingLogs, getStudentCheatingLogs, getExamCheatingSummary)
     │   │   ├── examController.js          (createExam, getExams, getExamById, updateExam, deleteExam)
+    │   │   ├── materialController.js      (uploadMaterial, getMaterials, getAllMaterials, toggleVisibility, updateMaterial, replaceMaterial, deleteMaterial, generateViewToken, downloadMaterial — streams to Cloudflare R2)
     │   │   ├── questionController.js      (addQuestion, getQuestions, deleteQuestion, createQuestion, getQuestion, updateQuestion, toggleActivateQuestion)
     │   │   ├── resultController.js        (submitExam, getMyResults, getExamResults)
     │   │   └── userController.js          (registerUser, loginUser, getMe)
@@ -45,14 +47,17 @@ ai v 5/
     │   ├── models/
     │   │   ├── cheatingLogModel.js        (CheatingLog schema: 23 violation type enums, severity, confidence, description, timestamp)
     │   │   ├── examModel.js               (Exam schema: title, description, duration, teacher ref, isActive, isPublished, totalMarks)
+    │   │   ├── materialModel.js           (Material schema: title, description, subject, teacher ref, fileName, r2Key, fileUrl, fileType, fileSize, isVisible, downloadCount)
     │   │   ├── questionModel.js           (Question schema: exam ref, text, options[4], correctOption 0-3, marks, isActive)
     │   │   ├── resultModel.js             (Result schema: student+exam refs, answers array, score, totalMarks, percentage, terminated, submittedAt, unique index)
     │   │   └── userModel.js               (User schema: name, email, password with bcrypt hash hook, role enum student/teacher)
     │   ├── routes/
     │   │   ├── cheatingLogRoutes.js       (POST /, GET /exam/:examId, GET /exam/:examId/summary, GET /exam/:examId/student/:studentId)
     │   │   ├── examRoutes.js              (GET /, POST /, GET /:id, PUT /:id, DELETE /:id, GET /:examId/questions, POST /:examId/questions, DELETE /:examId/questions/:questionId)
+    │   │   ├── materialRoutes.js          (GET /, GET /my, POST /, PUT /:id, PUT /:id/file, PATCH /:id/visibility, DELETE /:id, GET /:id/view-token, GET /:id/download)
     │   │   ├── resultRoutes.js            (POST /, GET /my, GET /exam/:examId)
     │   │   └── userRoutes.js              (POST /register, POST /login with rate limit, GET /me)
+    │   ├── uploads/                       (Legacy directory; files now stored in Cloudflare R2)
     │   └── utils/
     │       ├── calculateMarks.js          (iterates questions, compares selectedOption to correctOption, sums marks, computes percentage)
     │       └── generateToken.js           (jwt.sign wrapper, 7-day expiry, payload {id, role})
@@ -92,13 +97,16 @@ ai v 5/
     │           ├── student/
     │           │   ├── StudentDashboard.jsx  (Stats cards: Available/Active/Completed exams, grid of exam cards with Start Exam button)
     │           │   ├── ExamPage.jsx            (Exam-taking UI: timer, question navigator, prev/next/submit, ProctoringEngine overlay, critical violation counter, auto-submit on timeout or 3 violations)
-    │           │   └── ResultPage.jsx          (Score circle, pass/fail badge, stats grid, submission timestamp, back button)
+    │           │   ├── ResultPage.jsx          (Score circle, pass/fail badge, stats grid, submission timestamp, back button)
+    │           │   ├── MyResultsPage.jsx       (All student results history with score cards, percentage circles, pass/fail badges)
+    │           │   └── StudentMaterialsPage.jsx (Browse, search, filter study materials; open in browser or download via R2 CDN)
     │           └── teacher/
     │               ├── TeacherDashboard.jsx   (Stats cards: Total/Active/Total Students/Pass Rate, exam management grid with Questions/Results/Logs/Enable/Delete actions)
     │               ├── CreateExamPage.jsx     (Exam creation form: title, description, duration; on success navigates to exam detail)
     │               ├── ExamDetailPage.jsx     (Exam info header, add question form with 4 options + correctOption dropdown + marks, question list with correct answer highlight and delete)
     │               ├── ExamResultsPage.jsx    (Stats cards: Total Students/Passed/Avg Score, results table with student name/email/score/percentage/submittedAt)
-    │               └── CheatLogPage.jsx       (Violation summary cards: Total/Critical/High/Students, filter by type/severity, summary table per student, detailed timeline per student with confidence bars)
+    │               ├── CheatLogPage.jsx       (Violation summary cards: Total/Critical/High/Students, filter by type/severity, summary table per student, detailed timeline per student with confidence bars)
+    │               └── TeacherMaterialsPage.jsx (Upload with progress bar, edit metadata, replace file, toggle visibility, delete; streams to R2 with auto-fill title from filename)
     └── python-ai/
         ├── __init__.py             (Module docstring: "AI Proctoring System Python Module")
         ├── server.py               (FastAPI WebSocket server: accepts /ws, per-session FaceDetector/HeadPoseEstimator/HeadPoseLogic/SpeechDetector/SpeechLogic, global ObjectDetector, processes base64 frames + PCM audio, returns annotated frame + warnings JSON)
@@ -140,6 +148,8 @@ ai v 5/
 - **Framework:** Express 5.2.1
 - **Database:** MongoDB (via Mongoose 9.5.0)
 - **Auth:** JSON Web Tokens (jsonwebtoken 9.0.3) + bcryptjs 3.0.3
+- **File Upload:** multer 1.4.5-lts.1 (disk temp storage → stream to R2)
+- **Cloud Storage:** Cloudflare R2 via @aws-sdk/client-s3 3.1045.0 + @aws-sdk/lib-storage 3.1045.0 (parallel multipart streaming)
 - **Middleware:** cors 2.8.6, express-async-handler 1.2.0, express-rate-limit 8.5.0, dotenv 17.4.2
 - **HTTP Client:** axios 1.15.2 (for future external API calls)
 - **Dev:** nodemon 3.1.14
@@ -160,7 +170,7 @@ ai v 5/
 ### Database
 - **Engine:** MongoDB (local or Atlas, URI from `MONGO_URI` env var)
 - **ODM:** Mongoose 9.5.0
-- **Collections:** Users, Exams, Questions, Results, CheatingLogs
+- **Collections:** Users, Exams, Questions, Results, CheatingLogs, Materials
 
 ---
 
@@ -300,6 +310,23 @@ All protected endpoints require `Authorization: Bearer <jwt_token>`.
 |--------|------|--------|-------------|
 | GET | `/api/health` | Public | Returns `{status: "ok", env: process.env.NODE_ENV}`. |
 
+### Study Materials (`/api/materials`)
+
+| Method | Path | Access | Description |
+|--------|------|--------|-------------|
+| GET | `/api/materials` | Private (any authenticated) | List all visible materials (student view), populated with teacher name. |
+| GET | `/api/materials/my` | Teacher only | List teacher's own materials including hidden ones. |
+| POST | `/api/materials` | Teacher only | Upload new material (multipart/form-data). File streams through temp disk to Cloudflare R2 in 4 parallel 5MB chunks. |
+| PUT | `/api/materials/:id` | Teacher only (own) | Update material metadata only (title, description, subject). |
+| PUT | `/api/materials/:id/file` | Teacher only (own) | Replace file — deletes old R2 object, streams new file to R2. |
+| PATCH | `/api/materials/:id/visibility` | Teacher only (own) | Toggle `isVisible` boolean (show/hide from students). |
+| DELETE | `/api/materials/:id` | Teacher only (own) | Delete material from R2 and database. |
+| GET | `/api/materials/:id/view-token` | Private (any authenticated) | Generate short-lived JWT view token + return R2 public URL. |
+| GET | `/api/materials/:id/download` | Private (any authenticated) | Increment download count and return R2 public URL + filename. |
+
+**File constraints:** PDF, Word (.doc/.docx), PowerPoint (.ppt/.pptx) only. Max 50 MB.
+**Upload flow:** Browser → multer temp disk → `@aws-sdk/lib-storage Upload` → R2 in 4 parallel 5MB chunks → temp file cleaned up.
+
 ---
 
 ## 6. All Database Models
@@ -381,6 +408,24 @@ All protected endpoints require `Authorization: Bearer <jwt_token>`.
 **Violation Types Enum (23 values):**
 `no_face_detected`, `multiple_faces`, `cell_phone_detected`, `laptop_detected`, `tab_switch`, `fullscreen_exit`, `copy_paste`, `right_click`, `devtools_open`, `window_blur`, `camera_obstruction`, `microphone_muted`, `unauthorized_device`, `suspicious_movement`, `copy_paste_attempt`, `right_click_attempt`, `keyboard_shortcut`, `browser_dev_tools`, `screen_recording`, `unauthorized_access`, `time_anomaly`, `answer_pattern_anomaly`, `speech_detected`, `other`
 
+### Material (`backend/models/materialModel.js`)
+
+| Field | Type | Constraints | Purpose |
+|-------|------|-------------|---------|
+| `title` | String | required, trim, maxlength 200 | Display name |
+| `description` | String | trim, maxlength 500, default "" | Optional description |
+| `subject` | String | required, trim | Subject category for filtering |
+| `teacher` | ObjectId | ref: "User", required | Uploader |
+| `fileName` | String | required | Original file name (e.g. "Lecture1.pdf") |
+| `r2Key` | String | required | R2 object key (e.g. "materials/1234567890-file.pdf") |
+| `fileUrl` | String | required | R2 public CDN URL for direct browser access |
+| `fileType` | String | required, enum: ["pdf", "word", "powerpoint", "other"] | File category |
+| `fileSize` | Number | required | Size in bytes |
+| `isVisible` | Boolean | default true | If false, hidden from students |
+| `downloadCount` | Number | default 0 | Auto-incremented on each download |
+| `createdAt` | Date | auto (timestamps) | Creation time |
+| `updatedAt` | Date | auto (timestamps) | Last update time |
+
 ---
 
 ## 7. Environment Variables Required
@@ -394,6 +439,11 @@ All protected endpoints require `Authorization: Bearer <jwt_token>`.
 | `PORT` | No | 5000 | Express server port |
 | `ALLOWED_ORIGINS` | No | `http://localhost:5173` | CORS allowed origins (comma-separated) |
 | `NODE_ENV` | No | — | `development` or `production` (affects error stack exposure) |
+| `R2_ENDPOINT` | **Yes** | — | Cloudflare R2 S3-compatible endpoint URL |
+| `R2_ACCESS_KEY_ID` | **Yes** | — | R2 API access key |
+| `R2_SECRET_ACCESS_KEY` | **Yes** | — | R2 API secret key |
+| `R2_BUCKET_NAME` | **Yes** | — | R2 bucket name (e.g. `ai-proctor-materials`) |
+| `R2_PUBLIC_URL` | **Yes** | — | R2 public CDN URL (e.g. `https://pub-xxx.r2.dev`) |
 
 ### Python AI (`ai-proctor/python-ai/.env` — **file does not exist; optional**)
 
@@ -536,6 +586,12 @@ This uses `concurrently` to start backend (yellow), frontend (blue), and Python 
 | Global error handling with Mongoose error translation | `errorMiddleware.js` | Fully built |
 | Question sanitization for students (hides correctOption) | `questionController.js` | Fully built |
 | Postman collection with automated tests | `postman-collection-updated.json` | Fully built |
+| Study materials upload with streaming R2 storage | `materialController.js`, `materialModel.js`, `materialRoutes.js`, `r2.js`, `TeacherMaterialsPage.jsx` | Fully built |
+| Student materials browsing, search, filter, open, download | `StudentMaterialsPage.jsx`, `materialController.js` | Fully built |
+| Teacher materials management (edit, replace file, toggle visibility, delete) | `TeacherMaterialsPage.jsx`, `materialController.js` | Fully built |
+| Upload progress bar with percentage | `TeacherMaterialsPage.jsx` | Fully built |
+| Auto-fill title from selected filename | `TeacherMaterialsPage.jsx` | Fully built |
+| Material view token for secure file access | `materialController.js`, `StudentMaterialsPage.jsx` | Fully built |
 
 ### Partially Built
 

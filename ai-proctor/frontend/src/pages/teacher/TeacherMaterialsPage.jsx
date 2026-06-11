@@ -1,7 +1,6 @@
 // ── Imports ──────────────────────────────────────────────────────────
 import { useState, useEffect, useRef } from 'react';
 import axios from '../../api/axios';
-import Navbar from '../../components/Navbar';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 
@@ -158,8 +157,6 @@ const TeacherMaterialsPage = () => {
   // ── Render ─────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/20 to-gray-50">
-      <Navbar />
-
       <div className="max-w-5xl mx-auto px-4 py-8">
         {/* ── Page Header ──────────────────────────────────────────── */}
         <div className="mb-8">

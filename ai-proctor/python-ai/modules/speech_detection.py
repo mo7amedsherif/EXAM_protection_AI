@@ -14,14 +14,50 @@ def get_rms(chunk):
 
 class SpeechDetector:
     def __init__(self):
-        self.vad = webrtcvad.Vad(3) # Mode 3: most aggressive filtering — rejects distant/ambient noise
+        self.vad = webrtcvad.Vad(3)  # Mode 3: most aggressive filtering
         self.RATE = 16000
         self.is_human_speaking = False
         self.last_speech_time = 0
 
+        # ── Ambient baseline calibration ──────────────────────────
+        self.calibrated = False
+        self.calibration_samples = []
+        self.CALIBRATION_CHUNKS = 50  # ~3 seconds of audio
+        self.baseline_rms = 300       # fallback minimum
+        self.ambient_mean = 0
+        self.ambient_std = 0
+
+        # ── Consecutive speech debounce ───────────────────────────
+        self.consecutive_speech_count = 0
+        self.CONSECUTIVE_THRESHOLD = 3  # require 3 consecutive speech chunks
+
     def reset(self):
         self.is_human_speaking = False
         self.last_speech_time = 0
+        self.calibrated = False
+        self.calibration_samples = []
+        self.baseline_rms = 300
+        self.ambient_mean = 0
+        self.ambient_std = 0
+        self.consecutive_speech_count = 0
+
+    def _calibrate(self, rms):
+        """Collect ambient noise samples during calibration phase."""
+        self.calibration_samples.append(rms)
+        if len(self.calibration_samples) >= self.CALIBRATION_CHUNKS:
+            if self.calibration_samples:
+                n = len(self.calibration_samples)
+                self.ambient_mean = sum(self.calibration_samples) / n
+                variance = sum((x - self.ambient_mean) ** 2 for x in self.calibration_samples) / n
+                self.ambient_std = math.sqrt(variance)
+                # Baseline = mean + 2*std, with a minimum floor
+                self.baseline_rms = max(
+                    self.ambient_mean + 2 * self.ambient_std,
+                    300  # absolute minimum
+                )
+            self.calibrated = True
+            print(f"[Audio] Calibration complete. Ambient mean: {self.ambient_mean:.1f}, "
+                  f"std: {self.ambient_std:.1f}, baseline threshold: {self.baseline_rms:.1f}")
 
     def process_audio_chunk(self, audio_bytes):
         try:
@@ -33,17 +69,35 @@ class SpeechDetector:
             for i in range(0, len(audio_bytes), chunk_size):
                 chunk = audio_bytes[i:i+chunk_size]
                 if len(chunk) == chunk_size:
+                    rms = get_rms(chunk)
+
+                    # During calibration, just collect ambient samples
+                    if not self.calibrated:
+                        self._calibrate(rms)
+                        continue
+
+                    # After calibration: require BOTH VAD and RMS above baseline
                     if self.vad.is_speech(chunk, self.RATE):
-                        rms = get_rms(chunk)
-                        if rms > 300:
+                        # RMS must be significantly above ambient baseline
+                        if rms > self.baseline_rms * 2.5:
                             speech_detected = True
-                            print(f"[Audio] Speech chunk detected! RMS: {rms:.1f}")
                             break
 
+            if not self.calibrated:
+                # Still calibrating — never flag as speech
+                self.is_human_speaking = False
+                self.consecutive_speech_count = 0
+                return self.is_human_speaking
+
             if speech_detected:
-                self.last_speech_time = time.time()
+                self.consecutive_speech_count += 1
+                # Only flag as speaking after consecutive chunks confirm it
+                if self.consecutive_speech_count >= self.CONSECUTIVE_THRESHOLD:
+                    self.last_speech_time = time.time()
+            else:
+                self.consecutive_speech_count = 0
                 
-            # Restore 1.0s decay. Humans pause for breath; shorter decays break continuous speech and prevent 2-second triggers.
+            # 1.0s decay for continuous speech
             self.is_human_speaking = (time.time() - self.last_speech_time) < 1.0
             
             return self.is_human_speaking

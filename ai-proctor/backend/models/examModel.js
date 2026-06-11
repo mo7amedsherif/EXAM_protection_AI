@@ -35,6 +35,13 @@ const examSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    proctoringOptions: {
+      faceDetection:      { type: Boolean, default: true },
+      headPose:           { type: Boolean, default: true },
+      objectDetection:    { type: Boolean, default: true },
+      voiceDetection:     { type: Boolean, default: true },
+      tabSwitchDetection: { type: Boolean, default: true },
+    },
   },
   { timestamps: true }
 );
